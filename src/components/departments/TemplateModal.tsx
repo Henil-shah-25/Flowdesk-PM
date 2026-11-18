@@ -183,13 +183,35 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
         .map((s) => s.trim())
         .filter(Boolean);
 
+      let effectiveGroup = String(t.group_name || '').trim();
+      let displayTitle = rawTitle.trim();
+
+      if (!effectiveGroup || effectiveGroup.toLowerCase() === 'general') {
+        const bracketMatch = rawTitle.match(/^\[([^\]]+)\]\s*(.*)$/);
+        const colonMatch = rawTitle.match(/^([^:\n]{2,20}):\s+(.*)$/);
+        const dashMatch = rawTitle.match(/^([^-–—\n]{2,20})\s+[-–—]\s+(.*)$/);
+
+        if (bracketMatch) {
+          effectiveGroup = bracketMatch[1].trim();
+          displayTitle = bracketMatch[2].trim() || rawTitle.trim();
+        } else if (colonMatch) {
+          effectiveGroup = colonMatch[1].trim();
+          displayTitle = colonMatch[2].trim() || rawTitle.trim();
+        } else if (dashMatch) {
+          effectiveGroup = dashMatch[1].trim();
+          displayTitle = dashMatch[2].trim() || rawTitle.trim();
+        } else {
+          effectiveGroup = 'General';
+        }
+      }
+
       parsed.push({
         raw: t,
         id: String(t.id || `tmpl_${parsed.length + 1}`),
         department_name: String(t.department_name || '').trim(),
         sub_name: String(t.sub_name || '').trim(),
-        group_name: String(t.group_name || 'General').trim(),
-        task_title: rawTitle.trim(),
+        group_name: effectiveGroup,
+        task_title: displayTitle,
         description: String(t.description || '').trim(),
         priority,
         estimate_min,

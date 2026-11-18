@@ -54,9 +54,13 @@ export const api = {
   async list<T extends TabName>(tab: T): Promise<Array<TabRecordMap[T]>> {
     if (isLiveApiConfigured) {
       try {
-        return await remoteRequest<Array<TabRecordMap[T]>>('list', { tab });
+        const remoteData = await remoteRequest<Array<TabRecordMap[T]>>('list', { tab });
+        if (Array.isArray(remoteData)) {
+          setLocalTable(tab, remoteData);
+          return remoteData;
+        }
       } catch (err) {
-        console.warn(`Remote list for ${tab} failed, falling back to local cache`, err);
+        console.warn(`Remote list for ${tab} failed, using local cache:`, err);
         return getLocalTable<TabRecordMap[T]>(tab);
       }
     }
@@ -65,24 +69,20 @@ export const api = {
 
   async create<T extends TabName>(tab: T, row: Partial<TabRecordMap[T]>): Promise<TabRecordMap[T]> {
     if (isLiveApiConfigured) {
-      try {
-        const remoteItem = await remoteRequest<TabRecordMap[T]>('create', { tab, row });
-        // Also sync into local cache
-        const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
-        const remoteObj = remoteItem as unknown as Record<string, unknown>;
-        const existingIdx = items.findIndex(
-          (i) => String(i.id) === String(remoteObj.id)
-        );
-        if (existingIdx >= 0) {
-          items[existingIdx] = remoteObj;
-        } else {
-          items.push(remoteObj);
-        }
-        setLocalTable(tab, items);
-        return remoteItem;
-      } catch (err) {
-        console.warn(`Remote create for ${tab} failed, falling back to local cache`, err);
+      const remoteItem = await remoteRequest<TabRecordMap[T]>('create', { tab, row });
+      // Sync backend-confirmed record into local cache
+      const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
+      const remoteObj = remoteItem as unknown as Record<string, unknown>;
+      const existingIdx = items.findIndex(
+        (i) => String(i.id) === String(remoteObj.id)
+      );
+      if (existingIdx >= 0) {
+        items[existingIdx] = remoteObj;
+      } else {
+        items.push(remoteObj);
       }
+      setLocalTable(tab, items);
+      return remoteItem;
     }
 
     const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
@@ -104,21 +104,17 @@ export const api = {
     patch: Partial<TabRecordMap[T]>
   ): Promise<TabRecordMap[T]> {
     if (isLiveApiConfigured) {
-      try {
-        const remoteUpdated = await remoteRequest<TabRecordMap[T]>('update', { tab, id, patch });
-        const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
-        const remoteObj = remoteUpdated as unknown as Record<string, unknown>;
-        const index = items.findIndex(
-          (item) => String(item.id) === String(id) || (tab === 'Settings' && String(item.key) === String(id))
-        );
-        if (index >= 0) {
-          items[index] = { ...items[index], ...remoteObj };
-          setLocalTable(tab, items);
-        }
-        return remoteUpdated;
-      } catch (err) {
-        console.warn(`Remote update for ${tab} failed, falling back to local cache`, err);
+      const remoteUpdated = await remoteRequest<TabRecordMap[T]>('update', { tab, id, patch });
+      const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
+      const remoteObj = remoteUpdated as unknown as Record<string, unknown>;
+      const index = items.findIndex(
+        (item) => String(item.id) === String(id) || (tab === 'Settings' && String(item.key) === String(id))
+      );
+      if (index >= 0) {
+        items[index] = { ...items[index], ...remoteObj };
+        setLocalTable(tab, items);
       }
+      return remoteUpdated;
     }
 
     const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
@@ -142,11 +138,13 @@ export const api = {
 
   async delete<T extends TabName>(tab: T, id: string): Promise<{ deleted: boolean; id: string }> {
     if (isLiveApiConfigured) {
-      try {
-        await remoteRequest<{ deleted: boolean; id: string }>('delete', { tab, id });
-      } catch (err) {
-        console.warn(`Remote delete for ${tab} failed, falling back to local cache`, err);
-      }
+      const res = await remoteRequest<{ deleted: boolean; id: string }>('delete', { tab, id });
+      const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
+      const filtered = items.filter(
+        (item) => String(item.id) !== String(id) && !(tab === 'Settings' && String(item.key) === String(id))
+      );
+      setLocalTable(tab, filtered);
+      return res;
     }
 
     const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
@@ -162,13 +160,21 @@ export const api = {
     tab: T,
     rows: Array<Partial<TabRecordMap[T]>>
   ): Promise<Array<TabRecordMap[T]>> {
-    let remoteResults: Array<TabRecordMap[T]> | null = null;
     if (isLiveApiConfigured) {
-      try {
-        remoteResults = await remoteRequest<Array<TabRecordMap[T]>>('batchUpdate', { tab, rows });
-      } catch (err) {
-        console.warn(`Remote batchUpdate for ${tab} failed, falling back to local cache`, err);
-      }
+      const remoteResults = await remoteRequest<Array<TabRecordMap[T]>>('batchUpdate', { tab, rows });
+      const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
+      const itemMap = new Map<string, Record<string, unknown>>();
+      items.forEach((i) => {
+        const key = tab === 'Settings' ? String(i.key) : String(i.id);
+        itemMap.set(key, i);
+      });
+      remoteResults.forEach((r) => {
+        const row = r as unknown as Record<string, unknown>;
+        const key = tab === 'Settings' ? String(row.key) : String(row.id);
+        if (key) itemMap.set(key, row);
+      });
+      setLocalTable(tab, Array.from(itemMap.values()));
+      return remoteResults;
     }
 
     const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
@@ -179,9 +185,7 @@ export const api = {
     });
 
     const results: Array<Record<string, unknown>> = [];
-    const sourceRows = remoteResults && remoteResults.length > 0 ? remoteResults : rows;
-
-    sourceRows.forEach((r) => {
+    rows.forEach((r) => {
       const row = r as Record<string, unknown>;
       const key = tab === 'Settings' ? String(row.key) : String(row.id);
       if (key && itemMap.has(key)) {
@@ -209,11 +213,14 @@ export const api = {
     ids: string[]
   ): Promise<{ deleted: number; ids: string[] }> {
     if (isLiveApiConfigured) {
-      try {
-        return await remoteRequest<{ deleted: number; ids: string[] }>('batchDelete', { tab, ids });
-      } catch (err) {
-        console.warn(`Remote batchDelete for ${tab} failed, falling back to local cache`, err);
-      }
+      const res = await remoteRequest<{ deleted: number; ids: string[] }>('batchDelete', { tab, ids });
+      const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
+      const idSet = new Set(ids.map(String));
+      const filtered = items.filter(
+        (item) => !idSet.has(String(item.id)) && !(tab === 'Settings' && idSet.has(String(item.key)))
+      );
+      setLocalTable(tab, filtered);
+      return res;
     }
 
     const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;

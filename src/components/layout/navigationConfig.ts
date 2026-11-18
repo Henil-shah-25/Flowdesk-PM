@@ -7,6 +7,7 @@ import {
   Sun,
   Timer,
   BarChart3,
+  Users,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -19,6 +20,7 @@ export const navItems: NavItem[] = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { name: 'Projects', path: '/projects', icon: FolderKanban },
   { name: 'Tasks', path: '/tasks', icon: CheckSquare },
+  { name: 'Team', path: '/team', icon: Users },
   { name: 'Ideas', path: '/ideas', icon: Lightbulb },
   { name: 'Calendar', path: '/calendar', icon: CalendarIcon },
   { name: 'Today', path: '/today', icon: Sun },

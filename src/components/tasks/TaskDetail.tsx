@@ -15,6 +15,7 @@ import {
   Send,
   MessageSquare,
   ListTodo,
+  User,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useTaskDetail } from '../../hooks/useTaskDetail';
@@ -49,6 +50,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   const { data: allStages = [] } = useTableData('Stages');
   const { data: allSubtasks = [] } = useTableData('Subtasks');
   const { data: allNotes = [] } = useTableData('Notes');
+  const { data: members = [] } = useTableData('Members');
 
   const updateTask = useUpdateRecord('Tasks');
   const deleteTask = useDeleteRecord('Tasks');
@@ -492,6 +494,28 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
                   <div className="text-xs font-medium text-graphite truncate">
                     {project?.name || 'Workspace'}
                   </div>
+                </div>
+              </div>
+
+              {/* Tile 5: Assignee */}
+              <div className="p-3.5 rounded-2xl bg-white/60 border border-black/[0.06] flex items-center gap-3 col-span-2">
+                <div className="w-8 h-8 rounded-xl bg-black/[0.04] flex items-center justify-center shrink-0">
+                  <User size={16} className="text-secondary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] text-muted">Assignee</div>
+                  <select
+                    value={task.assignee_id || ''}
+                    onChange={(e) => triggerAutosave({ assignee_id: e.target.value })}
+                    className="text-xs font-medium text-graphite bg-transparent focus:outline-none w-full cursor-pointer truncate"
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} {m.role ? `(${m.role})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>

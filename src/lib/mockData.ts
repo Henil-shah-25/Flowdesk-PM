@@ -379,13 +379,13 @@ export const initialMockSettings: Setting[] = [
 ];
 
 export const INITIAL_STORAGE: Record<string, unknown[]> = {
-  Projects: initialMockProjects,
-  Departments: initialMockDepartments,
-  Stages: initialMockStages,
-  Tasks: initialMockTasks,
-  Ideas: initialMockIdeas,
-  TimeLogs: initialMockTimeLogs,
-  Templates: initialMockTemplates,
+  Projects: [],
+  Departments: [],
+  Stages: [],
+  Tasks: [],
+  Ideas: [],
+  TimeLogs: [],
+  Templates: [],
   Subtasks: [],
   Notes: [],
   Settings: initialMockSettings,

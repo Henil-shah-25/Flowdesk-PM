@@ -19,6 +19,12 @@ dist-ssr
 .dev.vars*
 !.env.example
 
+# Backups and temporary test scripts
+backups/
+*.tmp
+*.backup
+verify_*.cjs
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

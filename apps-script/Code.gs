@@ -9,7 +9,7 @@ const SCHEMAS = {
   Projects: ['id', 'parent_id', 'name', 'type', 'color', 'status', 'due_date', 'archived', 'created_at'],
   Departments: ['id', 'project_id', 'parent_id', 'name', 'color', 'enabled', 'order'],
   Stages: ['id', 'department_id', 'name', 'kind', 'color', 'order'],
-  Tasks: ['id', 'project_id', 'department_id', 'stage_id', 'title', 'description', 'priority', 'estimate_min', 'actual_min', 'due_date', 'order', 'done_at', 'recurring', 'source', 'template_id', 'created_at'],
+  Tasks: ['id', 'project_id', 'department_id', 'stage_id', 'title', 'description', 'priority', 'estimate_min', 'actual_min', 'due_date', 'order', 'done_at', 'recurring', 'source', 'template_id', 'assignee_id', 'created_at'],
   Ideas: ['id', 'title', 'body', 'color', 'x', 'y', 'w', 'h', 'rotation', 'z', 'status', 'project_id', 'department_id', 'stage_id', 'created_at'],
   TimeLogs: ['id', 'task_id', 'project_id', 'mode', 'start', 'end', 'duration_min'],
   Templates: ['id', 'department_name', 'sub_name', 'group_name', 'task_title', 'description', 'priority', 'estimate_min', 'order', 'subtasks'],
@@ -264,19 +264,29 @@ function actionBatchUpdate(tab, rows) {
 
 function actionBatchDelete(tab, ids) {
   const sheet = getSheet(tab);
+  const headers = getSheetHeaders(sheet, tab);
   const rows = getRowsAsObjects(sheet, tab);
   const idSet = new Set((ids || []).map(String));
   
-  // Find rows to delete (matching ids), delete from bottom up to avoid index shifting
-  const rowsToDelete = rows
-    .filter(r => idSet.has(String(r.id)) || (tab === 'Settings' && idSet.has(String(r.key))))
-    .sort((a, b) => b._rowIndex - a._rowIndex);
-    
-  rowsToDelete.forEach(r => {
-    sheet.deleteRow(r._rowIndex);
-  });
+  const remaining = rows.filter(r => !idSet.has(String(r.id)) && !(tab === 'Settings' && idSet.has(String(r.key))));
+  const deletedCount = rows.length - remaining.length;
   
-  return { deleted: rowsToDelete.length, ids: ids };
+  if (deletedCount === 0) {
+    return { deleted: 0, ids: ids };
+  }
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow > 1 && lastCol > 0) {
+    sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  }
+
+  if (remaining.length > 0) {
+    const values = remaining.map(row => headers.map(h => row[h] !== undefined ? row[h] : ''));
+    sheet.getRange(2, 1, values.length, headers.length).setValues(values);
+  }
+
+  return { deleted: deletedCount, ids: ids };
 }
 
 function handleRequest(action, payload) {

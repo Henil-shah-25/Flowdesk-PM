@@ -9,6 +9,7 @@ import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { DepartmentPipeline } from './pages/DepartmentPipeline';
 import { Tasks } from './pages/Tasks';
+import { Team } from './pages/Team';
 import { Ideas } from './pages/Ideas';
 import { Calendar } from './pages/Calendar';
 import { Today } from './pages/Today';
@@ -30,6 +31,7 @@ export function App() {
                 <Route path="projects/:projectId" element={<ProjectDetail />} />
                 <Route path="projects/:projectId/d/:departmentId" element={<DepartmentPipeline />} />
                 <Route path="tasks" element={<Tasks />} />
+                <Route path="team" element={<Team />} />
                 <Route path="ideas" element={<Ideas />} />
                 <Route path="calendar" element={<Calendar />} />
                 <Route path="today" element={<Today />} />

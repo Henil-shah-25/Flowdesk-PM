@@ -93,6 +93,8 @@ export interface TaskItem {
   archived?: boolean | string | number;
   source?: 'template' | 'manual' | 'idea';
   template_id?: string;
+  assignee_id?: string;
+  assignee_name?: string;
   checklist?: ChecklistItem[] | string;
   created_at: string;
 }
