@@ -1,0 +1,130 @@
+/* Flowdesk Design System Tokens — Flat Paper Cards, No Backdrop-Filter on Cards */
+:root {
+  /* Text Tokens */
+  --text-graphite: #17191B;
+  --text-secondary: rgba(23, 25, 27, 0.65);
+  --text-muted: rgba(23, 25, 27, 0.45);
+  --text-inverse: #FFFFFF;
+
+  /* Accent & Action Tokens */
+  --accent-lime: #BBD85A;
+  --accent-lime-hover: #a8c74e;
+  --accent-coral: #EE8D72;
+  --accent-amber: #F5A524;
+  --color-charcoal: #2B2E31;
+  --color-slate: #4A5159;
+  --color-nearblack: #17191B;
+
+  /* Tints for Department / Stage cards */
+  --tint-sky: #8DB3DE;
+  --tint-lime: #BBD85A;
+  --tint-coral: #EE8D72;
+  --tint-sage: #A5B87E;
+  --tint-peach: #E9B494;
+  --tint-charcoal: #2B2E31;
+  --tint-slate: #4A5159;
+
+  /* Panel — solid paper card, NO backdrop-filter */
+  --panel-bg: #F2F3EF;
+  --panel-border: rgba(27, 29, 31, 0.08);
+  --panel-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+  --panel-shadow: 0 20px 40px -22px rgba(20, 25, 30, 0.28);
+  --panel-radius: 30px;
+
+  /* Inner surfaces (rows, inputs, chips) — lighter than panel */
+  --inner-surface: rgba(255, 255, 255, 0.72);
+  --inner-surface-hover: rgba(255, 255, 255, 0.95);
+  --inner-surface-border: rgba(27, 29, 31, 0.07);
+  --inner-surface-radius: 18px;
+
+  /* Nav / modal blur — ONLY these get backdrop-filter */
+  --nav-blur: 20px;
+  --modal-blur: 24px;
+}
+
+/* ─── Paper Card Surface — NO backdrop-filter ─── */
+.glass-surface {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-highlight), var(--panel-shadow);
+  border-radius: var(--panel-radius);
+}
+
+/* ─── Tinted Card Variants — also NO backdrop-filter ─── */
+.glass-surface-sky {
+  background-color: var(--tint-sky);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 24px rgba(20, 25, 30, 0.12);
+  border-radius: var(--panel-radius);
+  color: var(--text-graphite);
+}
+
+.glass-surface-lime {
+  background-color: var(--tint-lime);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 24px rgba(20, 25, 30, 0.12);
+  border-radius: var(--panel-radius);
+  color: var(--text-graphite);
+}
+
+.glass-surface-coral {
+  background-color: var(--tint-coral);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 24px rgba(20, 25, 30, 0.12);
+  border-radius: var(--panel-radius);
+  color: var(--text-graphite);
+}
+
+.glass-surface-sage {
+  background-color: var(--tint-sage);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 24px rgba(20, 25, 30, 0.12);
+  border-radius: var(--panel-radius);
+  color: var(--text-graphite);
+}
+
+.glass-surface-peach {
+  background-color: var(--tint-peach);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 24px rgba(20, 25, 30, 0.12);
+  border-radius: var(--panel-radius);
+  color: var(--text-graphite);
+}
+
+.glass-surface-charcoal,
+.dark-card-surface {
+  background-color: var(--color-charcoal);
+  border-radius: 24px;
+  color: var(--text-inverse);
+  box-shadow: 0 20px 40px -20px rgba(18, 18, 18, 0.35);
+}
+
+.glass-surface-slate {
+  background-color: var(--color-slate);
+  border-radius: 24px;
+  color: var(--text-inverse);
+  box-shadow: 0 14px 44px rgba(20, 25, 30, 0.18);
+}
+
+/* ─── Inner Surface Utilities ─── */
+.inner-surface {
+  background-color: var(--inner-surface);
+  border: 1px solid var(--inner-surface-border);
+  border-radius: var(--inner-surface-radius);
+}
+
+.inner-surface-hover:hover {
+  background-color: var(--inner-surface-hover);
+}
+
+/* ─── Nav blur — ONLY the top bar pill uses this ─── */
+.nav-blur {
+  backdrop-filter: blur(var(--nav-blur));
+  -webkit-backdrop-filter: blur(var(--nav-blur));
+}
+
+/* ─── Modal backdrop blur ─── */
+.modal-backdrop {
+  backdrop-filter: blur(var(--modal-blur));
+  -webkit-backdrop-filter: blur(var(--modal-blur));
+}
