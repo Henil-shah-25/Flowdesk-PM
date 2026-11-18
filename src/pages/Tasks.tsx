@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTableData, useCreateRecord, useUpdateRecord } from '../hooks/useData';
 import { useToast } from '../components/common/Toast';
 import { Button, Modal } from '../components/ui';
+import { NewTaskModal } from '../components/tasks/NewTaskModal';
 import { CountUp } from '../components/common/CountUp';
 import { TaskDetailDrawer } from '../components/kanban/TaskDetailDrawer';
 import { TasksFilterBar } from '../components/tasks/TasksFilterBar';
@@ -24,7 +25,6 @@ export function Tasks() {
   const { data: departments = [] } = useTableData('Departments');
   const { data: stages = [] } = useTableData('Stages');
 
-  const createTask = useCreateRecord('Tasks');
   const updateTask = useUpdateRecord('Tasks');
 
   // Filter state
@@ -39,13 +39,6 @@ export function Tasks() {
 
   // New task modal state
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskProjectId, setNewTaskProjectId] = useState('');
-  const [newTaskDeptId, setNewTaskDeptId] = useState('');
-  const [newTaskStageId, setNewTaskStageId] = useState('');
-  const [newTaskPriority, setNewTaskPriority] = useState<TaskItem['priority']>('medium');
-  const [newTaskEstimate, setNewTaskEstimate] = useState(45);
-  const [newTaskDueDate, setNewTaskDueDate] = useState('');
 
   // Middle Stage Selection Popover State (if a department has multiple middle stages)
   const [middleStagePickerTask, setMiddleStagePickerTask] = useState<{
@@ -264,48 +257,7 @@ export function Tasks() {
 
   // Quick Open Modal
   const handleOpenNewTask = () => {
-    const defaultProj = (selectedProjectId !== 'all' ? selectedProjectId : projects[0]?.id) || '';
-    setNewTaskProjectId(defaultProj);
-
-    const availableDepts = departments.filter((d) => d.project_id === defaultProj);
-    const defaultDept = availableDepts[0]?.id || '';
-    setNewTaskDeptId(defaultDept);
-
-    const availableStgs = stages.filter((s) => s.department_id === defaultDept);
-    setNewTaskStageId(availableStgs[0]?.id || '');
-
-    setNewTaskTitle('');
-    setNewTaskPriority('medium');
-    setNewTaskEstimate(45);
-    setNewTaskDueDate('');
     setIsNewTaskModalOpen(true);
-  };
-
-  const handleCreateTaskSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim() || !newTaskProjectId) return;
-
-    createTask.mutate(
-      {
-        title: newTaskTitle.trim(),
-        project_id: newTaskProjectId,
-        department_id: newTaskDeptId,
-        stage_id: newTaskStageId,
-        priority: newTaskPriority,
-        estimate_min: newTaskEstimate,
-        actual_min: 0,
-        due_date: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : '',
-        order: tasks.length + 1,
-        created_at: new Date().toISOString(),
-      },
-      {
-        onSuccess: () => {
-          showToast({ message: `Created task "${newTaskTitle.trim()}"` });
-          setIsNewTaskModalOpen(false);
-          setNewTaskTitle('');
-        },
-      }
-    );
   };
 
   return (
@@ -425,145 +377,12 @@ export function Tasks() {
       )}
 
       {/* Create Task Modal */}
-      <Modal
+      {/* Guaranteed Visibility Task Creation Modal */}
+      <NewTaskModal
         isOpen={isNewTaskModalOpen}
         onClose={() => setIsNewTaskModalOpen(false)}
-        title="Create New Task"
-        description="Add a task across any project, department, and stage pipeline."
-      >
-        <form onSubmit={handleCreateTaskSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs text-secondary mb-1.5 font-medium">Task Title</label>
-            <input
-              type="text"
-              required
-              autoFocus
-              placeholder="e.g. Design wireframes for mobile checkout"
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              className="w-full px-4 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-lime/40"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-secondary mb-1.5 font-medium">Project</label>
-              <select
-                value={newTaskProjectId}
-                onChange={(e) => {
-                  const projId = e.target.value;
-                  setNewTaskProjectId(projId);
-                  const depts = departments.filter((d) => d.project_id === projId);
-                  setNewTaskDeptId(depts[0]?.id || '');
-                }}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none focus:ring-2 focus:ring-lime/40"
-              >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-secondary mb-1.5 font-medium">Department</label>
-              <select
-                value={newTaskDeptId}
-                onChange={(e) => {
-                  const deptId = e.target.value;
-                  setNewTaskDeptId(deptId);
-                  const stgs = stages.filter((s) => s.department_id === deptId);
-                  setNewTaskStageId(stgs[0]?.id || '');
-                }}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none focus:ring-2 focus:ring-lime/40"
-              >
-                {departments
-                  .filter((d) => d.project_id === newTaskProjectId)
-                  .map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs text-secondary mb-1.5 font-medium">Stage</label>
-              <select
-                value={newTaskStageId}
-                onChange={(e) => setNewTaskStageId(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none focus:ring-2 focus:ring-lime/40"
-              >
-                {stages
-                  .filter((s) => s.department_id === newTaskDeptId)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.kind})
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-secondary mb-1.5 font-medium">Priority</label>
-              <select
-                value={newTaskPriority}
-                onChange={(e) => setNewTaskPriority(e.target.value as TaskItem['priority'])}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none focus:ring-2 focus:ring-lime/40"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-secondary mb-1.5 font-medium">Estimate (min)</label>
-              <input
-                type="number"
-                min={5}
-                step={5}
-                value={newTaskEstimate}
-                onChange={(e) => setNewTaskEstimate(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none focus:ring-2 focus:ring-lime/40"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-secondary mb-1.5 font-medium">Due Date</label>
-            <input
-              type="date"
-              value={newTaskDueDate}
-              onChange={(e) => setNewTaskDueDate(e.target.value)}
-              className="w-full px-4 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none focus:ring-2 focus:ring-lime/40"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-black/[0.05]">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsNewTaskModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={!newTaskTitle.trim()}
-            >
-              Create Task
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        defaultProjectId={selectedProjectId !== 'all' ? selectedProjectId : undefined}
+      />
 
       {/* Middle Stage Selection Modal */}
       {middleStagePickerTask && (

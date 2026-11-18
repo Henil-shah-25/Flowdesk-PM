@@ -22,17 +22,21 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button, IconButton } from '../ui';
 import { TaskDetailDrawer } from './TaskDetailDrawer';
-import type { TaskItem, Stage, StageKind, StageColor } from '../../types';
+import { useTableData } from '../../hooks/useData';
+import type { TaskItem, Stage, StageKind, StageColor, TeamMember } from '../../types';
 import {
   Plus,
   MoreVertical,
   Clock,
   ArrowLeft,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Trash2,
   AlertCircle,
   Check,
   Sparkles,
+  User,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -495,6 +499,11 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
 }) => {
   // Mobile active stage for 390px viewports
   const [mobileActiveStageId, setMobileActiveStageId] = useState<string | null>(null);
+  const [moveStagePickerTaskId, setMoveStagePickerTaskId] = useState<string | null>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  // Members list for assignee resolution
+  const { data: members = [] } = useTableData('Members');
 
   // Selected task for task detail drawer
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
@@ -989,72 +998,340 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
         </div>
       )}
 
-      {/* Mobile Stage Selector Tab Strip (390px Viewports) */}
-      <div className="md:hidden flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-        {sortedStages.map((stage) => {
-          const isActive = (mobileActiveStageId || sortedStages[0]?.id) === stage.id;
-          const count = stageStats[stage.id]?.count || 0;
-          const colorDef = getStageColorConfig(stage.color, stage.kind);
-
-          return (
-            <button
-              key={stage.id}
-              type="button"
-              onClick={() => setMobileActiveStageId(stage.id)}
-              className={`px-4 py-2 rounded-full text-xs font-normal whitespace-nowrap transition-all border flex items-center gap-2 ${
-                isActive
-                  ? 'bg-charcoal text-white border-charcoal shadow-sm'
-                  : 'bg-white/60 text-secondary border-white/70 hover:bg-white/80'
-              }`}
-            >
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: colorDef.hex }}
-              />
-              <span>{stage.name}</span>
-              <span
-                className={`text-[11px] px-1.5 py-0.2 rounded-full ${
-                  isActive ? 'bg-white/20 text-white' : 'bg-black/5 text-graphite'
-                }`}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* DndContext Wrapping Columns: autoScroll enabled */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        autoScroll={{ threshold: { x: 0.1, y: 0.1 }, acceleration: 10 }}
+      {/* ─── MOBILE SINGLE-STATUS PIPELINE VIEW (<md) ─── */}
+      <div
+        className="md:hidden space-y-4 w-full"
+        onTouchStart={(e) => {
+          touchStartX.current = e.touches[0].clientX;
+        }}
+        onTouchEnd={(e) => {
+          if (touchStartX.current === null) return;
+          const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+          touchStartX.current = null;
+          if (Math.abs(deltaX) > 50) {
+            const currentActiveId = mobileActiveStageId || sortedStages[0]?.id;
+            const currentIndex = sortedStages.findIndex((s) => s.id === currentActiveId);
+            if (deltaX < 0 && currentIndex < sortedStages.length - 1) {
+              setMobileActiveStageId(sortedStages[currentIndex + 1].id);
+            } else if (deltaX > 0 && currentIndex > 0) {
+              setMobileActiveStageId(sortedStages[currentIndex - 1].id);
+            }
+          }
+        }}
       >
-        <div className="flex gap-5 overflow-x-auto pb-6 no-scrollbar items-start w-full pr-16">
+        {/* Horizontal Status Selector Tab Strip */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
           {sortedStages.map((stage) => {
-            const isMobileHidden =
-              (mobileActiveStageId || sortedStages[0]?.id) !== stage.id;
-            const columnTasks = filteredTasks.filter((t) => t.stage_id === stage.id);
+            const isActive = (mobileActiveStageId || sortedStages[0]?.id) === stage.id;
+            const count = stageStats[stage.id]?.count || 0;
             const colorDef = getStageColorConfig(stage.color, stage.kind);
-            const stats = stageStats[stage.id] || { count: 0, totalMinutes: 0 };
-            const isHoveredColumn = overStageId === stage.id && Boolean(activeDragTask);
 
             return (
-              <div
+              <button
                 key={stage.id}
-                style={{
-                  boxShadow: isHoveredColumn
-                    ? `0 0 32px ${colorDef.glow}`
-                    : '0 14px 44px rgba(20, 25, 30, 0.16)',
-                  borderColor: isHoveredColumn ? colorDef.border : 'rgba(255, 255, 255, 0.65)',
-                }}
-                className={`min-w-[310px] sm:min-w-[340px] md:min-w-[380px] w-full sm:w-[340px] md:w-[380px] rounded-[28px] bg-panel backdrop-blur-[24px] border p-5 flex flex-col shrink-0 transition-all duration-200 ${
-                  isMobileHidden ? 'hidden md:flex' : 'flex'
-                } ${isHoveredColumn ? 'ring-2 ring-white/70' : ''}`}
+                type="button"
+                onClick={() => setMobileActiveStageId(stage.id)}
+                className={`px-3.5 py-2 rounded-full text-xs font-normal whitespace-nowrap transition-all border flex items-center gap-2 ${
+                  isActive
+                    ? 'bg-charcoal text-white border-charcoal shadow-sm'
+                    : 'bg-white/60 text-secondary border-white/70 hover:bg-white/80'
+                }`}
               >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: colorDef.hex }}
+                />
+                <span className="font-medium">{stage.name}</span>
+                <span
+                  className={`text-[11px] px-1.5 py-0.2 rounded-full font-semibold ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-black/5 text-graphite'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active Stage Single View */}
+        {(() => {
+          const activeStage =
+            sortedStages.find((s) => s.id === (mobileActiveStageId || sortedStages[0]?.id)) ||
+            sortedStages[0];
+          if (!activeStage) return null;
+
+          const activeColorDef = getStageColorConfig(activeStage.color, activeStage.kind);
+          const activeTasks = filteredTasks.filter((t) => t.stage_id === activeStage.id);
+          const activeStats = stageStats[activeStage.id] || { count: 0, totalMinutes: 0 };
+          const currentIndex = sortedStages.findIndex((s) => s.id === activeStage.id);
+
+          return (
+            <div
+              data-stage-column={activeStage.name}
+              className="rounded-[24px] bg-panel backdrop-blur-[24px] border border-white/60 p-4 space-y-4 shadow-glass"
+            >
+              {/* Active Stage Header & Controls */}
+              <div className="flex items-center justify-between pb-3 border-b border-black/[0.05]">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className="w-3 h-3 rounded-full shrink-0"
+                    style={{ backgroundColor: activeColorDef.hex }}
+                  />
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-base text-graphite truncate flex items-center gap-1.5">
+                      <span>{activeStage.name}</span>
+                      <span className="text-xs text-secondary font-normal">
+                        ({activeTasks.length})
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-secondary">
+                      {formatTotalMinutes(activeStats.totalMinutes)} total
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Prev / Next Stage Buttons */}
+                  <button
+                    type="button"
+                    disabled={currentIndex <= 0}
+                    onClick={() => setMobileActiveStageId(sortedStages[currentIndex - 1].id)}
+                    className="w-7 h-7 rounded-full bg-white/60 hover:bg-white border border-white/70 flex items-center justify-center text-graphite disabled:opacity-30 disabled:pointer-events-none transition-all"
+                    title="Previous status"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={currentIndex >= sortedStages.length - 1}
+                    onClick={() => setMobileActiveStageId(sortedStages[currentIndex + 1].id)}
+                    className="w-7 h-7 rounded-full bg-white/60 hover:bg-white border border-white/70 flex items-center justify-center text-graphite disabled:opacity-30 disabled:pointer-events-none transition-all"
+                    title="Next status"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+
+                  {/* Direct + Add Task Button for this status */}
+                  {!isReadOnly && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const inputEl = document.getElementById(`mobile-quick-add-${activeStage.id}`);
+                        inputEl?.focus();
+                      }}
+                      className="h-7 px-2.5 rounded-full bg-lime text-nearblack font-medium text-xs flex items-center gap-1 shadow-xs active:scale-95 transition-all"
+                    >
+                      <Plus size={13} strokeWidth={2.5} />
+                      <span>Add</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tasks List */}
+              {activeTasks.length === 0 ? (
+                <div className="py-8 text-center space-y-2">
+                  <p className="text-xs text-secondary">No tasks in {activeStage.name} status.</p>
+                  {!isReadOnly && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const inputEl = document.getElementById(`mobile-quick-add-${activeStage.id}`);
+                        inputEl?.focus();
+                      }}
+                      className="text-xs text-graphite font-medium underline underline-offset-2"
+                    >
+                      + Add a task to this status
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {activeTasks.map((task) => {
+                    const isDone = activeStage.kind === 'done' || Boolean(task.done_at);
+                    const member = members.find((m: TeamMember) => m.id === task.assignee_id);
+                    const priorityColor =
+                      task.priority === 'urgent'
+                        ? '#E15554'
+                        : task.priority === 'high'
+                        ? '#EE8D72'
+                        : task.priority === 'medium'
+                        ? '#BBD85A'
+                        : '#8DB3DE';
+
+                    return (
+                      <div
+                        key={task.id}
+                        data-task-id={task.id}
+                        onClick={() => setSelectedTask(task)}
+                        className="p-3.5 rounded-2xl bg-white/70 hover:bg-white border border-white/80 shadow-xs active:scale-[0.99] transition-all space-y-2 cursor-pointer select-none"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium capitalize bg-black/[0.04] text-graphite border border-black/[0.04]">
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: priorityColor }}
+                            />
+                            {task.priority || 'medium'}
+                          </span>
+
+                          <span className="text-[11px] text-secondary flex items-center gap-1">
+                            <Clock size={11} className="opacity-70" />
+                            {task.due_date ? format(new Date(task.due_date), 'MMM d') : 'No due date'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h4
+                            className={`text-sm font-medium leading-snug tracking-tight text-graphite ${
+                              isDone ? 'line-through opacity-60' : ''
+                            }`}
+                          >
+                            {task.title}
+                          </h4>
+                          {task.description && (
+                            <p className="text-[11px] text-secondary line-clamp-1 mt-0.5">
+                              {task.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-black/[0.04] text-xs">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-secondary font-normal text-[11px]">
+                              <span className="font-semibold text-graphite">{task.estimate_min || 0}</span> min
+                            </span>
+
+                            {member && (
+                              <span className="flex items-center gap-1 text-[11px] text-secondary">
+                                <span className="w-4 h-4 rounded-full bg-lime text-nearblack font-bold text-[9px] flex items-center justify-center">
+                                  {member.name.charAt(0)}
+                                </span>
+                                <span className="truncate max-w-[70px]">{member.name}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Move Status Button */}
+                          {!isReadOnly && sortedStages.length > 1 && (
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setMoveStagePickerTaskId(
+                                    moveStagePickerTaskId === task.id ? null : task.id
+                                  )
+                                }
+                                className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-black/[0.04] hover:bg-black/[0.08] text-secondary hover:text-graphite flex items-center gap-1 transition-all"
+                              >
+                                <span>Move</span>
+                                <ArrowRight size={10} />
+                              </button>
+
+                              {moveStagePickerTaskId === task.id && (
+                                <div className="absolute right-0 bottom-full mb-1 w-44 rounded-xl bg-white/95 backdrop-blur-[20px] border border-black/[0.08] shadow-lg p-1.5 z-30 space-y-1">
+                                  <div className="px-2 py-1 text-[10px] font-semibold text-secondary uppercase tracking-wider">
+                                    Move to status:
+                                  </div>
+                                  {sortedStages.map((s) => (
+                                    <button
+                                      key={s.id}
+                                      type="button"
+                                      disabled={s.id === activeStage.id}
+                                      onClick={() => {
+                                        onUpdateTask(task.id, {
+                                          stage_id: s.id,
+                                          done_at: s.kind === 'done' ? new Date().toISOString() : '',
+                                        });
+                                        setMoveStagePickerTaskId(null);
+                                      }}
+                                      className={`w-full px-2 py-1.5 text-xs text-left rounded-lg flex items-center justify-between ${
+                                        s.id === activeStage.id
+                                          ? 'bg-black/[0.05] text-muted'
+                                          : 'hover:bg-lime/20 text-graphite font-medium'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span
+                                          className="w-2 h-2 rounded-full"
+                                          style={{
+                                            backgroundColor: getStageColorConfig(s.color, s.kind).hex,
+                                          }}
+                                        />
+                                        <span>{s.name}</span>
+                                      </div>
+                                      {s.id === activeStage.id && <Check size={12} className="text-secondary" />}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Inline Quick Add at bottom */}
+              {!isReadOnly && (
+                <form
+                  onSubmit={(e) => handleQuickAdd(activeStage.id, e)}
+                  className="pt-2 border-t border-black/[0.05]"
+                >
+                  <input
+                    id={`mobile-quick-add-${activeStage.id}`}
+                    type="text"
+                    placeholder={`+ Add task to ${activeStage.name} (Enter)`}
+                    value={quickAddTexts[activeStage.id] || ''}
+                    onChange={(e) =>
+                      setQuickAddTexts((prev) => ({
+                        ...prev,
+                        [activeStage.id]: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3.5 py-2 text-xs rounded-full bg-inner-surface hover:bg-white/80 focus:bg-white border border-white/70 text-graphite placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-nearblack/20 transition-all shadow-xs"
+                  />
+                </form>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* ─── DESKTOP MULTI-COLUMN KANBAN (md:) ─── */}
+      <div className="hidden md:block w-full">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          autoScroll={{ threshold: { x: 0.1, y: 0.1 }, acceleration: 10 }}
+        >
+          <div className="flex gap-5 overflow-x-auto pb-6 no-scrollbar items-start w-full pr-16">
+            {sortedStages.map((stage) => {
+              const columnTasks = filteredTasks.filter((t) => t.stage_id === stage.id);
+              const colorDef = getStageColorConfig(stage.color, stage.kind);
+              const stats = stageStats[stage.id] || { count: 0, totalMinutes: 0 };
+              const isHoveredColumn = overStageId === stage.id && Boolean(activeDragTask);
+
+              return (
+                <div
+                  key={stage.id}
+                  data-stage-column={stage.name}
+                  style={{
+                    boxShadow: isHoveredColumn
+                      ? `0 0 32px ${colorDef.glow}`
+                      : '0 14px 44px rgba(20, 25, 30, 0.16)',
+                    borderColor: isHoveredColumn ? colorDef.border : 'rgba(255, 255, 255, 0.65)',
+                  }}
+                  className={`w-[340px] md:w-[380px] rounded-[28px] bg-panel backdrop-blur-[24px] border p-5 flex flex-col shrink-0 transition-all duration-200 ${
+                    isHoveredColumn ? 'ring-2 ring-white/70' : ''
+                  }`}
+                >
                 {/* Column Header */}
                 <div className="flex items-center justify-between px-1 mb-3.5 relative">
                   <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
@@ -1389,6 +1666,7 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
             document.body
           )}
       </DndContext>
+      </div>
 
       {/* Task Detail Drawer */}
       <TaskDetailDrawer

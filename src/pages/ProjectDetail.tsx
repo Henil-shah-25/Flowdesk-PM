@@ -53,8 +53,8 @@ export const ProjectDetail: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: projects = [] } = useTableData('Projects');
-  const { data: departments = [] } = useTableData('Departments');
+  const { data: projects = [], isLoading: projectsLoading } = useTableData('Projects');
+  const { data: departments = [], isLoading: departmentsLoading } = useTableData('Departments');
   const { data: stages = [] } = useTableData('Stages');
   const { data: tasks = [] } = useTableData('Tasks');
 
@@ -136,6 +136,19 @@ export const ProjectDetail: React.FC = () => {
 
   // Sub-department form
   const [subDeptName, setSubDeptName] = useState('');
+
+  if ((projectsLoading || departmentsLoading) && !project) {
+    return (
+      <div className="space-y-8 animate-pulse">
+        <div className="h-8 w-40 bg-white/40 rounded-xl skeleton-shimmer" />
+        <div className="h-44 bg-white/40 rounded-[32px] skeleton-shimmer" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-52 bg-white/40 rounded-[32px] skeleton-shimmer" />
+          <div className="h-52 bg-white/40 rounded-[32px] skeleton-shimmer" />
+        </div>
+      </div>
+    );
+  }
 
   if (!project) {
     return (

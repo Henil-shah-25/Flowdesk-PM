@@ -39,6 +39,8 @@ export function useTableData<T extends TabName>(tab: T) {
   return useQuery({
     queryKey: [tab],
     queryFn: () => api.list(tab),
+    staleTime: 1000 * 60 * 2, // 2 minutes: eliminates redundant network calls during page navigation
+    gcTime: 1000 * 60 * 60 * 24,
   });
 }
 

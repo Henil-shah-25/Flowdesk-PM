@@ -1,9 +1,12 @@
 /**
  * Flowdesk - Google Apps Script Backend
- * Acts as the REST/JSON API backed by Google Sheets.
+ * Acts as the high-performance REST/JSON API backed by Google Sheets.
+ * Features Server-Side In-Memory Caching (CacheService) and Batch List.
  */
 
 const TOKEN_PROPERTY_KEY = 'FLOWDESK_API_TOKEN';
+const CACHE_PREFIX = 'FLOWDESK_CACHE_TAB_';
+const CACHE_TTL_SECONDS = 600; // 10 minutes TTL
 
 const SCHEMAS = {
   Projects: ['id', 'parent_id', 'name', 'type', 'color', 'status', 'due_date', 'archived', 'created_at'],
@@ -90,11 +93,12 @@ function getExpectedToken() {
   return PropertiesService.getScriptProperties().getProperty(TOKEN_PROPERTY_KEY);
 }
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status = 200, executionTimeMs = 0) {
   const output = ContentService.createTextOutput(JSON.stringify({
     status: status === 200 ? 'success' : 'error',
     data: status === 200 ? data : null,
     error: status !== 200 ? data : null,
+    execution_time_ms: executionTimeMs,
     timestamp: new Date().toISOString()
   }));
   output.setMimeType(ContentService.MimeType.JSON);
@@ -110,6 +114,40 @@ function validateAuth(token) {
     return { ok: false, error: 'Unauthorized: Invalid or missing token.' };
   }
   return { ok: true };
+}
+
+// ─── CACHE SERVICE HELPERS ───
+function getCachedTab(tab) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(CACHE_PREFIX + tab);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    // Ignore cache retrieval failure
+  }
+  return null;
+}
+
+function setCachedTab(tab, data) {
+  try {
+    const str = JSON.stringify(data);
+    // Google CacheService individual item limit is 100KB (102,400 bytes)
+    if (str.length < 95000) {
+      CacheService.getScriptCache().put(CACHE_PREFIX + tab, str, CACHE_TTL_SECONDS);
+    }
+  } catch (e) {
+    // Ignore cache storage failure
+  }
+}
+
+function invalidateTabCache(tab) {
+  try {
+    CacheService.getScriptCache().remove(CACHE_PREFIX + tab);
+  } catch (e) {
+    // Ignore cache invalidation failure
+  }
 }
 
 function getSheet(tab) {
@@ -160,10 +198,30 @@ function getRowsAsObjects(sheet, tab) {
 }
 
 function actionList(tab) {
+  // Check memory cache first
+  const cached = getCachedTab(tab);
+  if (cached && Array.isArray(cached)) {
+    return cached;
+  }
+
   const sheet = getSheet(tab);
   const rows = getRowsAsObjects(sheet, tab);
-  // remove internal _rowIndex before returning
-  return rows.map(({ _rowIndex, ...rest }) => rest);
+  const cleanRows = rows.map(({ _rowIndex, ...rest }) => rest);
+  
+  // Store into script cache
+  setCachedTab(tab, cleanRows);
+  return cleanRows;
+}
+
+function actionBatchList(tabs) {
+  const tabList = Array.isArray(tabs) ? tabs : Object.keys(SCHEMAS);
+  const result = {};
+  tabList.forEach(t => {
+    if (SCHEMAS[t]) {
+      result[t] = actionList(t);
+    }
+  });
+  return result;
 }
 
 function actionCreate(tab, row) {
@@ -181,6 +239,8 @@ function actionCreate(tab, row) {
   const rowValues = headers.map(h => newRow[h] !== undefined ? newRow[h] : '');
   sheet.appendRow(rowValues);
   
+  // Invalidate cache for this tab
+  invalidateTabCache(tab);
   return newRow;
 }
 
@@ -200,6 +260,9 @@ function actionUpdate(tab, id, patch) {
   
   sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
   
+  // Invalidate cache for this tab
+  invalidateTabCache(tab);
+  
   const { _rowIndex, ...cleanUpdated } = updated;
   return cleanUpdated;
 }
@@ -214,6 +277,7 @@ function actionDelete(tab, id) {
   }
   
   sheet.deleteRow(target._rowIndex);
+  invalidateTabCache(tab);
   return { deleted: true, id: id };
 }
 
@@ -259,6 +323,8 @@ function actionBatchUpdate(tab, rows) {
     sheet.getRange(startRow, 1, valuesToAppend.length, headers.length).setValues(valuesToAppend);
   }
   
+  // Invalidate cache for this tab
+  invalidateTabCache(tab);
   return results;
 }
 
@@ -286,17 +352,21 @@ function actionBatchDelete(tab, ids) {
     sheet.getRange(2, 1, values.length, headers.length).setValues(values);
   }
 
+  // Invalidate cache for this tab
+  invalidateTabCache(tab);
   return { deleted: deletedCount, ids: ids };
 }
 
 function handleRequest(action, payload) {
-  const { tab, row, id, patch, rows, ids } = payload;
+  const { tab, row, id, patch, rows, ids, tabs } = payload;
   
   switch (action) {
     case 'ping':
       return { ok: true };
     case 'list':
       return actionList(tab);
+    case 'batchList':
+      return actionBatchList(tabs);
     case 'create':
       return actionCreate(tab, row);
     case 'update':
@@ -313,25 +383,27 @@ function handleRequest(action, payload) {
 }
 
 function doGet(e) {
+  const startTime = new Date().getTime();
   try {
     const params = (e && e.parameter) || {};
     const token = params.token;
     
     const auth = validateAuth(token);
     if (!auth.ok) {
-      return jsonResponse(auth.error, 401);
+      return jsonResponse(auth.error, 401, new Date().getTime() - startTime);
     }
     
     const action = params.action || 'list';
     const payload = {
       tab: params.tab,
-      id: params.id
+      id: params.id,
+      tabs: params.tabs ? params.tabs.split(',') : undefined
     };
     
     const result = handleRequest(action, payload);
-    return jsonResponse(result);
+    return jsonResponse(result, 200, new Date().getTime() - startTime);
   } catch (err) {
-    return jsonResponse(err.message || String(err), 500);
+    return jsonResponse(err.message || String(err), 500, new Date().getTime() - startTime);
   }
 }
 
@@ -340,13 +412,14 @@ function doGet(e) {
  * Using text/plain payload to avoid CORS preflight options.
  */
 function doPost(e) {
+  const startTime = new Date().getTime();
   try {
     let body = {};
     if (e && e.postData && e.postData.contents) {
       try {
         body = JSON.parse(e.postData.contents);
       } catch (parseErr) {
-        return jsonResponse('Invalid JSON body: ' + parseErr.message, 400);
+        return jsonResponse('Invalid JSON body: ' + parseErr.message, 400, new Date().getTime() - startTime);
       }
     } else if (e && e.parameter) {
       body = e.parameter;
@@ -355,17 +428,17 @@ function doPost(e) {
     const token = body.token || (e && e.parameter && e.parameter.token);
     const auth = validateAuth(token);
     if (!auth.ok) {
-      return jsonResponse(auth.error, 401);
+      return jsonResponse(auth.error, 401, new Date().getTime() - startTime);
     }
     
     const action = body.action;
     if (!action) {
-      return jsonResponse('Missing "action" parameter', 400);
+      return jsonResponse('Missing "action" parameter', 400, new Date().getTime() - startTime);
     }
     
     const result = handleRequest(action, body);
-    return jsonResponse(result);
+    return jsonResponse(result, 200, new Date().getTime() - startTime);
   } catch (err) {
-    return jsonResponse(err.message || String(err), 500);
+    return jsonResponse(err.message || String(err), 500, new Date().getTime() - startTime);
   }
 }

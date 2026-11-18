@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { GlassCard, Chip, ProgressBar, Modal } from '../components/ui';
-import { useTableData, useCreateRecord, useUpdateRecord } from '../hooks/useData';
+import { GlassCard, Chip, ProgressBar } from '../components/ui';
+import { useTableData, useUpdateRecord } from '../hooks/useData';
+import { NewTaskModal } from '../components/tasks/NewTaskModal';
 import type { TaskItem, Idea } from '../types';
 import { computeProjectHealth } from '../lib/health';
 import {
@@ -123,12 +124,8 @@ export const Dashboard: React.FC = () => {
   const { data: departments = [] } = useTableData('Departments');
   const { data: stages = [] } = useTableData('Stages');
   const { data: ideas = [] } = useTableData('Ideas');
-  const createTask = useCreateRecord('Tasks');
   const updateTask = useUpdateRecord('Tasks');
-
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [selectedPriority, setSelectedPriority] = useState<TaskItem['priority']>('high');
 
   const now = new Date();
   const todayStart = startOfDay(now);
@@ -177,37 +174,6 @@ export const Dashboard: React.FC = () => {
     { label: 'Focus hours', value: Math.min(100, (focusMinToday / 480) * 100), color: 'var(--accent-coral)', r: 44, s: 7 },
     { label: 'Projects', value: Math.min(100, (projectsTouchedIds.size / Math.max(1, activeProjects.length)) * 100), color: 'var(--tint-sky)', r: 32, s: 6 },
   ];
-
-  const handleCreateTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-
-    const targetProject = activeProjects[0] || projects[0];
-    if (!targetProject) {
-      navigate('/projects');
-      return;
-    }
-
-    const projDepts = departments.filter((d) => d.project_id === targetProject.id);
-    const targetDept = projDepts[0];
-    const deptStages = targetDept ? stages.filter((s) => s.department_id === targetDept.id) : [];
-    const targetStage =
-      deptStages.find((s) => s.name.toLowerCase() === 'started' || s.kind === 'normal') ||
-      deptStages[0];
-
-    createTask.mutate({
-      title: newTaskTitle.trim(),
-      project_id: targetProject.id,
-      department_id: targetDept?.id || '',
-      stage_id: targetStage?.id || '',
-      priority: selectedPriority,
-      estimate_min: 30,
-      actual_min: 0,
-      order: tasks.length + 1,
-    });
-    setNewTaskTitle('');
-    setIsModalOpen(false);
-  };
 
   const toggleTask = (task: TaskItem) => {
     updateTask.mutate({ id: task.id, patch: { done_at: task.done_at ? '' : new Date().toISOString() } });
@@ -530,51 +496,8 @@ export const Dashboard: React.FC = () => {
         </GlassCard>
       </div>
 
-      {/* Task Creation Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New task" description="Add to your queue.">
-        <form onSubmit={handleCreateTask} className="space-y-4">
-          <div>
-            <label className="block text-xs text-secondary mb-1.5">Title</label>
-            <input
-              type="text" required autoFocus
-              placeholder="What needs to be done?"
-              value={newTaskTitle}
-              onChange={e => setNewTaskTitle(e.target.value)}
-              className="w-full px-4 py-2.5 text-sm rounded-full bg-white/60 border border-black/[0.08] text-graphite placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-nearblack/20"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-secondary mb-1.5">Priority</label>
-            <div className="flex gap-2">
-              {(['low', 'medium', 'high', 'urgent'] as const).map(pri => (
-                <button key={pri} type="button" onClick={() => setSelectedPriority(pri)}
-                  className={`flex-1 py-1.5 text-xs rounded-full capitalize transition-all border ${
-                    selectedPriority === pri
-                      ? 'bg-nearblack text-white border-nearblack font-medium'
-                      : 'bg-white/40 text-secondary border-black/[0.07] hover:bg-white/70'
-                  }`}
-                >{pri}</button>
-              ))}
-            </div>
-          </div>
-          <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-black/[0.06]">
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              className="flex-1 sm:flex-initial h-10 px-4 rounded-full text-sm text-secondary hover:text-graphite border border-black/[0.07] bg-white/40 active:scale-95 transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex-1 sm:flex-initial h-10 px-5 rounded-full text-sm font-medium bg-lime text-nearblack hover:bg-[var(--accent-lime-hover)] active:scale-95 transition-all disabled:opacity-60"
-              disabled={createTask.isPending}
-            >
-              Add task
-            </button>
-          </div>
-        </form>
-      </Modal>
+      {/* Guaranteed Visibility Task Creation Modal */}
+      <NewTaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 };

@@ -13,12 +13,23 @@ import {
   XCircle,
   AlertCircle,
   Layers,
+  Search,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  ListTree,
+  LayoutGrid,
+  Filter,
+  Check,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import { GlassCard, Button, Modal, ProgressBar } from '../components/ui';
 import { useTableData, useCreateRecord, useUpdateRecord, useDeleteRecord } from '../hooks/useData';
 import { useToast } from '../components/common/Toast';
-import type { TeamMember, LeaveRequest, MessageItem, TaskItem } from '../types';
-import { format } from 'date-fns';
+import { CountUp } from '../components/common/CountUp';
+import type { TeamMember, LeaveRequest, MessageItem, TaskItem, Project, Department } from '../types';
+import { format, parseISO, isWithinInterval } from 'date-fns';
 
 export const Team: React.FC = () => {
   const { data: members = [], isLoading: membersLoading } = useTableData('Members');
@@ -26,6 +37,7 @@ export const Team: React.FC = () => {
   const { data: leaveRequests = [] } = useTableData('Leave');
   const { data: messages = [] } = useTableData('Messages');
   const { data: departments = [] } = useTableData('Departments');
+  const { data: projects = [] } = useTableData('Projects');
   const { showToast } = useToast();
 
   const createMember = useCreateRecord('Members');
@@ -38,8 +50,16 @@ export const Team: React.FC = () => {
 
   const createMessage = useCreateRecord('Messages');
 
-  // Sub-navigation tabs
-  const [activeTab, setActiveTab] = useState<'members' | 'workload' | 'org' | 'leave' | 'chat'>('members');
+  // Sub-navigation tabs: Overview first, then Directory, Workload, Org, Leave, Chat
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'workload' | 'org' | 'leave' | 'chat'>('overview');
+
+  // Directory Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('all');
+
+  // Org Chart controls
+  const [orgZoom, setOrgZoom] = useState(1);
+  const [orgViewMode, setOrgViewMode] = useState<'cards' | 'tree'>('cards');
 
   // Member Modal State
   const [memberModalOpen, setMemberModalOpen] = useState(false);
@@ -60,7 +80,20 @@ export const Team: React.FC = () => {
   // Chat message input
   const [chatInput, setChatInput] = useState('');
 
-  // Workload calculations: tasks per member
+  // ─── LEAVE & ACTIVE MEMBER CALCULATIONS ───
+  const { activeLeaves, onLeaveMemberIds } = useMemo(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const approved = leaveRequests.filter((l: LeaveRequest) => {
+      if (l.status !== 'approved') return false;
+      const start = l.start_date ? l.start_date.substring(0, 10) : '';
+      const end = l.end_date ? l.end_date.substring(0, 10) : start;
+      return start <= todayStr && end >= todayStr;
+    });
+    const ids = new Set(approved.map((l) => l.member_id));
+    return { activeLeaves: approved, onLeaveMemberIds: ids };
+  }, [leaveRequests]);
+
+  // ─── WORKLOAD CALCULATIONS: TASKS PER MEMBER ───
   const memberWorkload = useMemo(() => {
     return members.map((member) => {
       const assignedTasks = tasks.filter((t: TaskItem) => t.assignee_id === member.id && !t.done_at);
@@ -69,6 +102,7 @@ export const Team: React.FC = () => {
       // 40h standard weekly capacity
       const capacityPercent = Math.min(100, Math.round((hours / 40) * 100));
       const isOverloaded = hours > 40;
+      const isOnLeave = onLeaveMemberIds.has(member.id);
 
       return {
         member,
@@ -76,9 +110,84 @@ export const Team: React.FC = () => {
         totalHours: hours,
         capacityPercent,
         isOverloaded,
+        isOnLeave,
       };
     });
-  }, [members, tasks]);
+  }, [members, tasks, onLeaveMemberIds]);
+
+  // ─── TEAM OVERVIEW METRICS (DERIVED FROM REAL BACKEND DATA) ───
+  const overviewMetrics = useMemo(() => {
+    const totalMembers = members.length;
+    const membersOnLeaveCount = onLeaveMemberIds.size;
+    const activeMembersCount = Math.max(0, totalMembers - membersOnLeaveCount);
+
+    const activeProjectsCount = projects.filter(
+      (p: Project) => !p.archived && p.status !== 'completed'
+    ).length;
+
+    const activeAssignedTasks = tasks.filter(
+      (t: TaskItem) => !t.done_at && Boolean(t.assignee_id)
+    );
+    const activeTasksCount = activeAssignedTasks.length;
+
+    const totalMinutes = activeAssignedTasks.reduce(
+      (sum, t) => sum + (Number(t.estimate_min) || 30),
+      0
+    );
+    const totalWeeklyHours = Math.round((totalMinutes / 60) * 10) / 10;
+
+    // Total available weekly capacity = active members * 40h
+    const totalTeamCapacityHours = activeMembersCount * 40;
+    const utilizationPct =
+      totalTeamCapacityHours > 0
+        ? Math.min(100, Math.round((totalWeeklyHours / totalTeamCapacityHours) * 100))
+        : 0;
+    const availableCapacityPct = Math.max(0, 100 - utilizationPct);
+
+    return {
+      totalMembers,
+      activeMembersCount,
+      membersOnLeaveCount,
+      activeProjectsCount,
+      activeTasksCount,
+      totalWeeklyHours,
+      totalTeamCapacityHours,
+      utilizationPct,
+      availableCapacityPct,
+    };
+  }, [members, projects, tasks, onLeaveMemberIds]);
+
+  // Filtered members for directory
+  const filteredMembers = useMemo(() => {
+    return members.filter((m) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = m.name?.toLowerCase().includes(q);
+        const matchRole = m.role?.toLowerCase().includes(q);
+        const matchEmail = m.email?.toLowerCase().includes(q);
+        if (!matchName && !matchRole && !matchEmail) return false;
+      }
+
+      if (selectedDeptFilter !== 'all') {
+        const dept = (m.team_id || '').toLowerCase();
+        if (dept !== selectedDeptFilter.toLowerCase()) return false;
+      }
+
+      return true;
+    });
+  }, [members, searchQuery, selectedDeptFilter]);
+
+  // Unique department names for filtering
+  const allDeptNames = useMemo(() => {
+    const set = new Set<string>();
+    members.forEach((m) => {
+      if (m.team_id && m.team_id.trim()) set.add(m.team_id.trim());
+    });
+    departments.forEach((d) => {
+      if (d.name && d.name.trim()) set.add(d.name.trim());
+    });
+    return Array.from(set);
+  }, [members, departments]);
 
   // Open member modal for create
   const handleOpenAddMember = () => {
@@ -171,7 +280,7 @@ export const Team: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12 max-w-7xl mx-auto">
+    <div className="space-y-8 pb-16 max-w-7xl mx-auto">
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
@@ -183,7 +292,7 @@ export const Team: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <Button
             variant="primary"
             size="md"
@@ -199,7 +308,8 @@ export const Team: React.FC = () => {
       {/* Segmented Sub-Nav Controls */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
         {[
-          { id: 'members', label: `Members (${members.length})`, icon: Users },
+          { id: 'overview', label: 'Team Overview', icon: Sparkles },
+          { id: 'members', label: `Directory (${members.length})`, icon: Users },
           { id: 'workload', label: 'Workload & Capacity', icon: Briefcase },
           { id: 'org', label: 'Organisation Chart', icon: Layers },
           { id: 'leave', label: `Leave (${leaveRequests.length})`, icon: Calendar },
@@ -224,37 +334,220 @@ export const Team: React.FC = () => {
         })}
       </div>
 
+      {/* ─── TAB 0: TEAM OVERVIEW ─── */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* 6 Real Live Metric Tiles */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <GlassCard className="p-4 sm:p-5 space-y-1">
+              <div className="text-xs text-secondary font-normal">Total Members</div>
+              <div className="text-2xl sm:text-3xl font-light text-graphite tracking-tight">
+                <CountUp value={overviewMetrics.totalMembers} />
+              </div>
+              <div className="text-[11px] text-secondary">Registered team</div>
+            </GlassCard>
+
+            <GlassCard className="p-4 sm:p-5 space-y-1">
+              <div className="text-xs text-secondary font-normal">Active Today</div>
+              <div className="text-2xl sm:text-3xl font-light text-graphite tracking-tight">
+                <CountUp value={overviewMetrics.activeMembersCount} />
+              </div>
+              <div className="text-[11px] text-[#4D6B10] font-medium">Available now</div>
+            </GlassCard>
+
+            <GlassCard className="p-4 sm:p-5 space-y-1">
+              <div className="text-xs text-secondary font-normal">On Leave</div>
+              <div className="text-2xl sm:text-3xl font-light text-coral tracking-tight">
+                <CountUp value={overviewMetrics.membersOnLeaveCount} />
+              </div>
+              <div className="text-[11px] text-secondary">Approved leave</div>
+            </GlassCard>
+
+            <GlassCard className="p-4 sm:p-5 space-y-1">
+              <div className="text-xs text-secondary font-normal">Active Tasks</div>
+              <div className="text-2xl sm:text-3xl font-light text-graphite tracking-tight">
+                <CountUp value={overviewMetrics.activeTasksCount} />
+              </div>
+              <div className="text-[11px] text-secondary">In execution</div>
+            </GlassCard>
+
+            <GlassCard className="p-4 sm:p-5 space-y-1">
+              <div className="text-xs text-secondary font-normal">Weekly Hours</div>
+              <div className="text-2xl sm:text-3xl font-light text-graphite tracking-tight">
+                {overviewMetrics.totalWeeklyHours}h
+              </div>
+              <div className="text-[11px] text-secondary">Total estimate</div>
+            </GlassCard>
+
+            <GlassCard className="p-4 sm:p-5 space-y-1">
+              <div className="text-xs text-secondary font-normal">Available Cap.</div>
+              <div className="text-2xl sm:text-3xl font-light text-graphite tracking-tight">
+                {overviewMetrics.availableCapacityPct}%
+              </div>
+              <div className="text-[11px] text-secondary">Team bandwidth</div>
+            </GlassCard>
+          </div>
+
+          {/* Capacity & Distribution Glass Panels */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Team Utilization Bar */}
+            <GlassCard className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-medium text-graphite">Weekly Team Capacity</h3>
+                  <p className="text-xs text-secondary mt-0.5">
+                    {overviewMetrics.totalWeeklyHours}h scheduled vs {overviewMetrics.totalTeamCapacityHours}h max capacity (40h/member)
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-graphite">
+                  {overviewMetrics.utilizationPct}% utilized
+                </span>
+              </div>
+
+              <ProgressBar
+                value={overviewMetrics.utilizationPct}
+                accent={overviewMetrics.utilizationPct > 85 ? 'coral' : 'lime'}
+                size="md"
+              />
+
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-black/[0.05] text-xs">
+                <div>
+                  <div className="text-secondary text-[11px]">Active Members</div>
+                  <div className="font-medium text-graphite mt-0.5">{overviewMetrics.activeMembersCount} people</div>
+                </div>
+                <div>
+                  <div className="text-secondary text-[11px]">Projects Active</div>
+                  <div className="font-medium text-graphite mt-0.5">{overviewMetrics.activeProjectsCount} projects</div>
+                </div>
+                <div>
+                  <div className="text-secondary text-[11px]">Health Status</div>
+                  <div className="font-medium text-[#4D6B10] mt-0.5">
+                    {overviewMetrics.utilizationPct > 85 ? 'High Load' : 'Balanced'}
+                  </div>
+                </div>
+              </div>
+            </GlassCard>
+
+            {/* Department Breakdown */}
+            <GlassCard className="p-6 space-y-4">
+              <div>
+                <h3 className="text-base font-medium text-graphite">Department Distribution</h3>
+                <p className="text-xs text-secondary mt-0.5">Staffing across active functional divisions</p>
+              </div>
+
+              <div className="space-y-3">
+                {allDeptNames.slice(0, 4).map((dept) => {
+                  const count = members.filter(
+                    (m) => (m.team_id || '').toLowerCase() === dept.toLowerCase()
+                  ).length;
+                  const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
+                  return (
+                    <div key={dept} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-medium text-graphite">{dept}</span>
+                        <span className="text-secondary">{count} members ({pct}%)</span>
+                      </div>
+                      <ProgressBar value={pct} accent="lime" size="sm" />
+                    </div>
+                  );
+                })}
+              </div>
+            </GlassCard>
+          </div>
+        </div>
+      )}
+
       {/* ─── TAB 1: MEMBERS DIRECTORY ─── */}
       {activeTab === 'members' && (
         <div className="space-y-4">
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <div className="relative w-full">
+                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary" />
+                <input
+                  type="text"
+                  placeholder="Search members by name, role, email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-full bg-white/70 border border-black/[0.08] text-graphite placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-nearblack/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setSelectedDeptFilter('all')}
+                className={`h-8 px-3 rounded-full text-xs transition-all border ${
+                  selectedDeptFilter === 'all'
+                    ? 'bg-nearblack text-white border-nearblack font-medium'
+                    : 'bg-white/60 text-secondary border-black/[0.06] hover:bg-white'
+                }`}
+              >
+                All Departments
+              </button>
+              {allDeptNames.map((dept) => (
+                <button
+                  key={dept}
+                  onClick={() => setSelectedDeptFilter(dept)}
+                  className={`h-8 px-3 rounded-full text-xs transition-all border whitespace-nowrap ${
+                    selectedDeptFilter.toLowerCase() === dept.toLowerCase()
+                      ? 'bg-nearblack text-white border-nearblack font-medium'
+                      : 'bg-white/60 text-secondary border-black/[0.06] hover:bg-white'
+                  }`}
+                >
+                  {dept}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {membersLoading ? (
             <div className="py-12 text-center text-secondary text-sm">Loading team members...</div>
-          ) : members.length === 0 ? (
+          ) : filteredMembers.length === 0 ? (
             <GlassCard className="p-12 text-center flex flex-col items-center justify-center gap-3">
               <div className="w-12 h-12 rounded-full bg-lime/20 flex items-center justify-center text-nearblack">
                 <Users size={24} />
               </div>
-              <h3 className="text-lg font-medium text-graphite">No team members yet</h3>
+              <h3 className="text-lg font-medium text-graphite">No members found</h3>
               <p className="text-xs text-secondary max-w-sm">
-                Add team members to assign tasks, monitor workload, and collaborate across departments.
+                Try adjusting your search criteria or add new members to the team.
               </p>
               <Button variant="primary" size="sm" onClick={handleOpenAddMember} className="mt-2">
-                Add your first member
+                Add member
               </Button>
             </GlassCard>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {members.map((m) => {
+              {filteredMembers.map((m) => {
                 const assigned = tasks.filter((t: TaskItem) => t.assignee_id === m.id && !t.done_at);
+                const totalMinutes = assigned.reduce((sum, t) => sum + (Number(t.estimate_min) || 30), 0);
+                const hours = Math.round((totalMinutes / 60) * 10) / 10;
+                const capacityPct = Math.min(100, Math.round((hours / 40) * 100));
+                const isOnLeave = onLeaveMemberIds.has(m.id);
+
                 return (
                   <GlassCard key={m.id} className="p-5 flex flex-col justify-between gap-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-11 h-11 rounded-full bg-lime flex items-center justify-center text-nearblack font-semibold text-sm shrink-0 shadow-sm">
+                        <div className="w-11 h-11 rounded-full bg-lime flex items-center justify-center text-nearblack font-semibold text-sm shrink-0 shadow-sm relative">
                           {m.name.charAt(0).toUpperCase()}
+                          {isOnLeave && (
+                            <span
+                              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-coral border-2 border-white"
+                              title="On leave"
+                            />
+                          )}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="font-medium text-base text-graphite truncate">{m.name}</h4>
+                          <h4 className="font-medium text-base text-graphite truncate flex items-center gap-1.5">
+                            <span>{m.name}</span>
+                            {isOnLeave && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-coral/15 text-coral font-normal">
+                                On Leave
+                              </span>
+                            )}
+                          </h4>
                           <p className="text-xs text-secondary truncate">{m.role || 'Member'}</p>
                         </div>
                       </div>
@@ -275,6 +568,19 @@ export const Team: React.FC = () => {
                           <Trash2 size={13} />
                         </button>
                       </div>
+                    </div>
+
+                    {/* Member workload bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-secondary">{hours}h / 40h scheduled</span>
+                        <span className="font-medium text-graphite">{capacityPct}%</span>
+                      </div>
+                      <ProgressBar
+                        value={capacityPct}
+                        accent={capacityPct > 100 ? 'coral' : 'lime'}
+                        size="sm"
+                      />
                     </div>
 
                     <div className="space-y-2 pt-2 border-t border-black/[0.06] text-xs text-secondary">
@@ -316,7 +622,7 @@ export const Team: React.FC = () => {
             </GlassCard>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {memberWorkload.map(({ member, taskCount, totalHours, capacityPercent, isOverloaded }) => (
+              {memberWorkload.map(({ member, taskCount, totalHours, capacityPercent, isOverloaded, isOnLeave }) => (
                 <GlassCard key={member.id} className="p-5 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -324,7 +630,14 @@ export const Team: React.FC = () => {
                         {member.name.charAt(0)}
                       </div>
                       <div>
-                        <div className="font-medium text-sm text-graphite">{member.name}</div>
+                        <div className="font-medium text-sm text-graphite flex items-center gap-1.5">
+                          <span>{member.name}</span>
+                          {isOnLeave && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-coral/15 text-coral font-normal">
+                              On Leave
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-secondary">{member.role || 'Team Member'}</div>
                       </div>
                     </div>
@@ -357,18 +670,86 @@ export const Team: React.FC = () => {
         </div>
       )}
 
-      {/* ─── TAB 3: ORGANISATION CHART ─── */}
+      {/* ─── TAB 3: ORGANISATION CHART (WITH ZOOM & MOBILE TREE VIEW) ─── */}
       {activeTab === 'org' && (
         <GlassCard className="p-6 space-y-6">
-          <div>
-            <h3 className="text-lg font-light text-graphite">Team Hierarchy & Departments</h3>
-            <p className="text-xs text-secondary mt-0.5">Structure and functional distribution across Flowdesk.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-light text-graphite">Team Hierarchy & Departments</h3>
+              <p className="text-xs text-secondary mt-0.5">Structure and functional distribution across Flowdesk.</p>
+            </div>
+
+            {/* Controls: Zoom In / Zoom Out / Reset & View Toggle */}
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              {/* Cards vs Tree toggle */}
+              <div className="flex items-center bg-white/60 rounded-full border border-black/[0.08] p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setOrgViewMode('cards')}
+                  className={`px-3 py-1 rounded-full text-xs transition-all flex items-center gap-1.5 ${
+                    orgViewMode === 'cards'
+                      ? 'bg-nearblack text-white font-medium shadow-xs'
+                      : 'text-secondary hover:text-graphite'
+                  }`}
+                >
+                  <LayoutGrid size={12} />
+                  <span>Cards</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrgViewMode('tree')}
+                  className={`px-3 py-1 rounded-full text-xs transition-all flex items-center gap-1.5 ${
+                    orgViewMode === 'tree'
+                      ? 'bg-nearblack text-white font-medium shadow-xs'
+                      : 'text-secondary hover:text-graphite'
+                  }`}
+                >
+                  <ListTree size={12} />
+                  <span>Hierarchy</span>
+                </button>
+              </div>
+
+              {/* Zoom Buttons */}
+              <div className="flex items-center bg-white/60 rounded-full border border-black/[0.08] p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setOrgZoom((prev) => Math.min(prev + 0.15, 1.6))}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-secondary hover:text-graphite"
+                  title="Zoom In"
+                >
+                  <ZoomIn size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrgZoom((prev) => Math.max(prev - 0.15, 0.7))}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-secondary hover:text-graphite"
+                  title="Zoom Out"
+                >
+                  <ZoomOut size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrgZoom(1)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-secondary hover:text-graphite"
+                  title="Reset Zoom"
+                >
+                  <RotateCcw size={12} />
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-6">
+          <div
+            style={{
+              transform: `scale(${orgZoom})`,
+              transformOrigin: 'top left',
+              transition: 'transform 200ms ease',
+            }}
+            className="space-y-6"
+          >
             {departments.length === 0 && members.length === 0 ? (
               <p className="text-sm text-secondary">No departments or members defined yet.</p>
-            ) : (
+            ) : orgViewMode === 'cards' ? (
               departments.map((dept) => {
                 const deptMembers = members.filter(
                   (m) => (m.team_id || '').toLowerCase() === dept.name.toLowerCase()
@@ -400,6 +781,42 @@ export const Team: React.FC = () => {
                   </div>
                 );
               })
+            ) : (
+              /* Tree / Hierarchical Mobile View */
+              <div className="space-y-4">
+                {departments.map((dept) => {
+                  const deptMembers = members.filter(
+                    (m) => (m.team_id || '').toLowerCase() === dept.name.toLowerCase()
+                  );
+                  return (
+                    <div key={dept.id} className="rounded-2xl border border-black/[0.06] bg-white/60 overflow-hidden">
+                      <div className="p-3.5 bg-black/[0.02] flex items-center justify-between border-b border-black/[0.04]">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: dept.color || '#8DB3DE' }} />
+                          <span className="font-semibold text-sm text-graphite">{dept.name}</span>
+                        </div>
+                        <span className="text-xs text-secondary font-medium">{deptMembers.length} staff</span>
+                      </div>
+                      <div className="p-3 divide-y divide-black/[0.04]">
+                        {deptMembers.map((m) => (
+                          <div key={m.id} className="py-2 flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-lime text-nearblack font-bold text-[10px] flex items-center justify-center">
+                                {m.name.charAt(0)}
+                              </span>
+                              <span className="font-medium text-graphite">{m.name}</span>
+                            </div>
+                            <span className="text-secondary">{m.role || 'Member'}</span>
+                          </div>
+                        ))}
+                        {deptMembers.length === 0 && (
+                          <div className="py-2 text-xs text-secondary italic">No members in this department</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </GlassCard>
@@ -506,65 +923,68 @@ export const Team: React.FC = () => {
 
       {/* ─── TAB 5: TEAM CHAT ─── */}
       {activeTab === 'chat' && (
-        <GlassCard className="p-6 flex flex-col h-[520px]">
-          <div className="border-b border-black/[0.06] pb-3 mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageSquare size={16} className="text-secondary" />
-              <h3 className="font-medium text-sm text-graphite">Workspace General Channel</h3>
+        <GlassCard className="p-5 flex flex-col h-[520px]">
+          <div className="pb-3 border-b border-black/[0.05] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-lime" />
+              <h4 className="font-medium text-sm text-graphite">#general channel</h4>
             </div>
-            <span className="text-xs text-muted">{messages.length} messages</span>
+            <span className="text-xs text-secondary">{members.length} members</span>
           </div>
 
-          {/* Messages list */}
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+          <div className="flex-1 overflow-y-auto space-y-3 py-4 pr-1">
             {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-secondary text-sm">
-                <MessageSquare size={28} className="opacity-40 mb-2" />
-                No messages yet. Send a note to the team!
+              <div className="h-full flex flex-col items-center justify-center text-secondary text-xs">
+                <MessageSquare size={24} className="mb-2 opacity-50" />
+                <span>No messages yet. Start the conversation with your team!</span>
               </div>
             ) : (
               messages.map((msg: MessageItem) => (
-                <div key={msg.id} className="p-3 rounded-2xl bg-white/60 border border-black/[0.04] space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-graphite">{msg.sender_name || 'Member'}</span>
-                    <span className="text-[10px] text-muted">
-                      {msg.created_at ? format(new Date(msg.created_at), 'h:mm a') : ''}
-                    </span>
+                <div key={msg.id} className="flex items-start gap-2.5 text-xs">
+                  <div className="w-7 h-7 rounded-full bg-lime text-nearblack font-semibold flex items-center justify-center text-[10px] shrink-0">
+                    {(msg.sender_name || 'U').charAt(0)}
                   </div>
-                  <p className="text-xs text-secondary leading-relaxed">{msg.content}</p>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-graphite">{msg.sender_name}</span>
+                      <span className="text-[10px] text-muted">
+                        {msg.created_at ? format(new Date(msg.created_at), 'h:mm a') : ''}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/60 border border-black/[0.04] text-graphite">
+                      {msg.content}
+                    </div>
+                  </div>
                 </div>
               ))
             )}
           </div>
 
-          {/* Message input */}
-          <form onSubmit={handleSendMessage} className="pt-3 border-t border-black/[0.06] flex items-center gap-2">
+          <form onSubmit={handleSendMessage} className="pt-3 border-t border-black/[0.05] flex items-center gap-2">
             <input
               type="text"
+              placeholder="Send a message to the team..."
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Write a message to the team..."
-              className="flex-1 px-4 py-2.5 text-xs rounded-full bg-white/60 border border-black/[0.08] text-graphite focus:outline-none focus:ring-2 focus:ring-nearblack/20"
+              className="flex-1 px-4 py-2 text-xs rounded-full bg-white/70 border border-black/[0.08] text-graphite focus:outline-none focus:ring-2 focus:ring-nearblack/20"
             />
-            <Button
+            <button
               type="submit"
-              variant="primary"
-              size="sm"
-              icon={<Send size={13} />}
-              disabled={createMessage.isPending || !chatInput.trim()}
+              disabled={!chatInput.trim()}
+              className="w-8 h-8 rounded-full bg-nearblack text-white flex items-center justify-center disabled:opacity-40 transition-opacity"
             >
-              Send
-            </Button>
+              <Send size={13} />
+            </button>
           </form>
         </GlassCard>
       )}
 
-      {/* Member Modal */}
+      {/* Member Modal (Create / Edit) */}
       <Modal
         isOpen={memberModalOpen}
         onClose={() => setMemberModalOpen(false)}
-        title={editingMember ? 'Edit team member' : 'Add team member'}
-        description="Team members can be assigned tasks and scheduled for deliverables."
+        title={editingMember ? 'Edit team member' : 'Add new team member'}
+        description="Configure details, roles, and functional assignments."
       >
         <form onSubmit={handleSaveMember} className="space-y-4">
           <div>
@@ -572,10 +992,9 @@ export const Team: React.FC = () => {
             <input
               type="text"
               required
-              autoFocus
               value={memberName}
               onChange={(e) => setMemberName(e.target.value)}
-              placeholder="e.g. Alex Rivera"
+              placeholder="e.g. Sarah Jenkins"
               className="w-full px-4 py-2 text-xs rounded-full bg-white/60 border border-black/[0.08] text-graphite focus:outline-none focus:ring-2 focus:ring-nearblack/20"
             />
           </div>
@@ -586,7 +1005,7 @@ export const Team: React.FC = () => {
               type="email"
               value={memberEmail}
               onChange={(e) => setMemberEmail(e.target.value)}
-              placeholder="e.g. alex@company.com"
+              placeholder="sarah@company.com"
               className="w-full px-4 py-2 text-xs rounded-full bg-white/60 border border-black/[0.08] text-graphite focus:outline-none focus:ring-2 focus:ring-nearblack/20"
             />
           </div>

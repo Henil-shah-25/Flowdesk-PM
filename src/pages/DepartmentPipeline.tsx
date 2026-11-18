@@ -9,11 +9,12 @@ import {
   useBatchUpdateRecord,
 } from '../hooks/useData';
 import { PipelineBoard } from '../components/kanban/PipelineBoard';
-import { Button, GlassCard, IconButton, Modal } from '../components/ui';
+import { Button, GlassCard, IconButton } from '../components/ui';
 import { TemplateModal } from '../components/departments/TemplateModal';
+import { NewTaskModal } from '../components/tasks/NewTaskModal';
 import { useToast } from '../components/common/Toast';
 import { CountUp } from '../components/common/CountUp';
-import type { Department, TaskItem } from '../types';
+import type { Department } from '../types';
 import {
   ChevronRight,
   ArrowLeft,
@@ -57,10 +58,6 @@ export function DepartmentPipeline() {
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskPriority, setNewTaskPriority] = useState<TaskItem['priority']>('medium');
-  const [newTaskEstimate, setNewTaskEstimate] = useState(45);
-  const [newTaskDueDate, setNewTaskDueDate] = useState('');
 
   const currentProject = useMemo(() => {
     return projects.find((p) => p.id === projectId);
@@ -182,41 +179,6 @@ export function DepartmentPipeline() {
 
     showToast({
       message: 'Exported pipeline data successfully.',
-    });
-  };
-
-  // Modal new task submission
-  const handleCreateNewTaskSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim() || !currentDepartment || !projectId) return;
-
-    const startedStage =
-      stages.find((s) => s.name.toLowerCase() === 'started' || s.kind === 'normal') ||
-      stages[0];
-
-    if (!startedStage) {
-      showToast({ message: 'No stages available.' });
-      return;
-    }
-
-    createTaskMutation.mutate({
-      project_id: projectId,
-      department_id: currentDepartment.id,
-      stage_id: startedStage.id,
-      title: newTaskTitle.trim(),
-      priority: newTaskPriority,
-      estimate_min: newTaskEstimate,
-      actual_min: 0,
-      due_date: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : '',
-      order: tasks.length + 1,
-      created_at: new Date().toISOString(),
-    });
-
-    setNewTaskTitle('');
-    setNewTaskDueDate('');
-    setIsNewTaskModalOpen(false);
-    showToast({
-      message: `Created task "${newTaskTitle.trim()}".`,
     });
   };
 
@@ -547,85 +509,14 @@ export function DepartmentPipeline() {
         onTurnDepartmentOn={handleTurnOn}
       />
 
-      {/* New Task Modal */}
-      <Modal
+      {/* Guaranteed Visibility Task Creation Modal */}
+      <NewTaskModal
         isOpen={isNewTaskModalOpen}
         onClose={() => setIsNewTaskModalOpen(false)}
-        title="Add New Task"
-        description={`Create a new task in ${currentDepartment.name}.`}
-      >
-        <form onSubmit={handleCreateNewTaskSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs text-secondary mb-1.5">Task Title</label>
-            <input
-              type="text"
-              required
-              autoFocus
-              placeholder="e.g. Conduct SERP keyword mapping"
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              className="w-full px-4 py-2.5 text-xs sm:text-sm rounded-full bg-white/60 border border-white/70 text-graphite placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-nearblack/20"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-secondary mb-1.5">Priority</label>
-              <select
-                value={newTaskPriority}
-                onChange={(e) => setNewTaskPriority(e.target.value as TaskItem['priority'])}
-                className="w-full px-3.5 py-2 text-xs rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs text-secondary mb-1.5">Estimate (min)</label>
-              <input
-                type="number"
-                min="5"
-                step="5"
-                value={newTaskEstimate}
-                onChange={(e) => setNewTaskEstimate(Number(e.target.value) || 0)}
-                className="w-full px-3.5 py-2 text-xs rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-secondary mb-1.5">Target Due Date</label>
-            <input
-              type="date"
-              value={newTaskDueDate}
-              onChange={(e) => setNewTaskDueDate(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs rounded-full bg-white/60 border border-white/70 text-graphite focus:outline-none"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-black/[0.04]">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsNewTaskModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={!newTaskTitle.trim()}
-            >
-              Add Task
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        defaultProjectId={projectId}
+        defaultDepartmentId={currentDepartment.id}
+        defaultStageId={stages[0]?.id}
+      />
 
       {/* Template Selection Modal */}
       {currentDepartment && (

@@ -114,25 +114,31 @@ export const Projects: React.FC = () => {
       },
       {
         onSuccess: async (newProj) => {
-          if (newProj && newProj.id) {
-            // Immediately run auto-setup for departments, sub-departments & 4 stages and sync to backend
-            await autoSetupProject(newProj.id, projectType, chosenDepartments);
-            queryClient.invalidateQueries({ queryKey: ['Departments'] });
-            queryClient.invalidateQueries({ queryKey: ['Stages'] });
-            queryClient.invalidateQueries({ queryKey: ['Tasks'] });
-            queryClient.invalidateQueries({ queryKey: ['Projects'] });
-          }
-
+          setIsModalOpen(false);
           setProjectName('');
           setDueDate('');
           setChosenDepartments(getDefaultEnabledDepartmentNames('Project'));
-          setIsModalOpen(false);
           showToast({
             message: `Project "${projectName.trim()}" created with default pipelines`,
           });
+
           if (newProj && newProj.id) {
             navigate(`/projects/${newProj.id}`);
+            // Run background sync for departments & default stages
+            autoSetupProject(newProj.id, projectType, chosenDepartments).then(() => {
+              queryClient.invalidateQueries({ queryKey: ['Departments'] });
+              queryClient.invalidateQueries({ queryKey: ['Stages'] });
+              queryClient.invalidateQueries({ queryKey: ['Tasks'] });
+              queryClient.invalidateQueries({ queryKey: ['Projects'] });
+            });
           }
+        },
+        onError: (err) => {
+          console.error('Project creation failed:', err);
+          setIsModalOpen(false);
+          showToast({
+            message: 'Failed to create project. Please try again.',
+          });
         },
       }
     );

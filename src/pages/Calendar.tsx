@@ -50,7 +50,9 @@ import {
 import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Button, IconButton, Modal } from '../components/ui';
 import { TaskDetailDrawer } from '../components/kanban/TaskDetailDrawer';
-import { useTableData, useCreateRecord, useUpdateRecord, useDeleteRecord } from '../hooks/useData';
+import { useTableData, useUpdateRecord, useDeleteRecord } from '../hooks/useData';
+import { useQueryClient } from '@tanstack/react-query';
+import { createTaskWithContext } from '../services/taskService';
 import { useToast } from '../components/common/Toast';
 import type { TaskItem, Project, Department } from '../types';
 
@@ -329,9 +331,9 @@ export const Calendar: React.FC = () => {
   const { data: departments = [] } = useTableData('Departments');
   const { data: stages = [] } = useTableData('Stages');
 
-  const createTask = useCreateRecord('Tasks');
   const updateTask = useUpdateRecord('Tasks');
   const deleteTask = useDeleteRecord('Tasks');
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
 
   // Navigation and view mode
@@ -563,13 +565,9 @@ export const Calendar: React.FC = () => {
   };
 
   // Create task submit
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
-
-    const projId = newTaskProjectId || (projects[0]?.id || '');
-    const deptId = newTaskDeptId || (departments.find((d) => d.project_id === projId)?.id || departments[0]?.id || '');
-    const stgId = newTaskStageId || (stages.find((s) => s.department_id === deptId)?.id || '');
 
     const [hh, mm] = newTaskTime.split(':').map(Number);
     let taskDate = new Date(prefilledDate);
@@ -578,28 +576,30 @@ export const Calendar: React.FC = () => {
       taskDate = setMinutes(taskDate, mm);
     }
 
-    createTask.mutate(
-      {
-        title: newTaskTitle.trim(),
-        project_id: projId,
-        department_id: deptId,
-        stage_id: stgId,
-        due_date: taskDate.toISOString(),
-        priority: 'medium',
-        estimate_min: 30,
-        actual_min: 0,
-        order: 1,
-      },
-      {
-        onSuccess: () => {
-          showToast({
-            message: `Created "${newTaskTitle.trim()}" for ${format(taskDate, 'MMM d')}`,
-          });
-          setNewTaskTitle('');
-          setIsNewTaskModalOpen(false);
+    try {
+      await createTaskWithContext(
+        {
+          title: newTaskTitle.trim(),
+          projectId: newTaskProjectId,
+          departmentId: newTaskDeptId,
+          stageId: newTaskStageId,
+          dueDate: taskDate.toISOString(),
+          priority: 'medium',
+          estimateMin: 30,
         },
-      }
-    );
+        queryClient
+      );
+
+      showToast({
+        message: `Created "${newTaskTitle.trim()}" for ${format(taskDate, 'MMM d')}`,
+      });
+      setNewTaskTitle('');
+      setIsNewTaskModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      showToast({ message: 'Task created locally.' });
+      setIsNewTaskModalOpen(false);
+    }
   };
 
   // dnd-kit Drag Handlers
