@@ -138,7 +138,7 @@ function DroppableColumn({
       ref={setNodeRef}
       data-stage-column={col.id}
       data-droppable-id={col.id}
-      className={`min-w-[310px] sm:min-w-[340px] md:min-w-[380px] w-full sm:w-[340px] md:w-[380px] rounded-[32px] bg-panel backdrop-blur-[24px] border p-5 flex flex-col shrink-0 transition-all duration-200 ${
+      className={`min-w-[82vw] max-w-[310px] sm:min-w-[340px] md:min-w-[380px] w-[82vw] sm:w-[340px] md:w-[380px] rounded-[28px] sm:rounded-[32px] bg-panel backdrop-blur-[24px] border p-4 sm:p-5 flex flex-col shrink-0 snap-start transition-all duration-200 ${
         isOver
           ? 'ring-2 ring-lime border-lime bg-white/70 shadow-xl scale-[1.01]'
           : 'border-white/60 shadow-glass'
@@ -268,7 +268,7 @@ export const TaskBoardView: React.FC<TaskBoardViewProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-6 overflow-x-auto pb-8 pt-2 no-scrollbar items-start w-full">
+      <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-8 pt-2 no-scrollbar items-start w-full snap-x snap-mandatory">
         {COLUMNS.map((col) => (
           <DroppableColumn
             key={col.id}

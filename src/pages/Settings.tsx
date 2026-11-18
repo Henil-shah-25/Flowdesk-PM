@@ -276,17 +276,17 @@ export const Settings: React.FC = () => {
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-16">
       {/* Title */}
-      <div>
-        <h1 className="text-[clamp(40px,4.5vw,56px)] font-light tracking-[-0.02em] text-graphite leading-[1.08]">
+      <div className="pt-1">
+        <h1 className="text-[clamp(28px,6vw,44px)] sm:text-[clamp(36px,4.5vw,56px)] font-light tracking-[-0.02em] text-graphite leading-[1.08]">
           Settings
         </h1>
-        <p className="text-sm sm:text-base text-secondary mt-2 font-normal">
+        <p className="text-xs sm:text-base text-secondary mt-1.5 sm:mt-2 font-normal">
           Google Sheets connection, template library, and workspace provisioning.
         </p>
       </div>
 
       {/* Connection Card */}
-      <GlassCard className="space-y-5">
+      <GlassCard className="!p-4 sm:!p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div

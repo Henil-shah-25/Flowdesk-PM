@@ -467,10 +467,10 @@ export const ProjectDetail: React.FC = () => {
       </div>
 
       {/* Project Master Overview Card */}
-      <GlassCard className="space-y-5">
+      <GlassCard className="!p-4 sm:!p-7 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="space-y-2 min-w-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{
@@ -482,7 +482,7 @@ export const ProjectDetail: React.FC = () => {
                       : '#2DBE8C',
                 }}
               />
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-light tracking-tight text-graphite leading-tight">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-light tracking-tight text-graphite leading-tight break-words">
                 {project.name}
               </h1>
               <Chip label={project.type || 'Project'} accent="neutral" size="sm" dot={false} />

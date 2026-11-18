@@ -231,17 +231,17 @@ export const Projects: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
-          <h1 className="text-[clamp(52px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05]">
+          <h1 className="text-[clamp(30px,6.5vw,52px)] sm:text-[clamp(44px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05]">
             Projects & Initiatives
           </h1>
-          <p className="text-sm sm:text-base text-secondary mt-2 font-normal">
+          <p className="text-xs sm:text-base text-secondary mt-1.5 sm:mt-2 font-normal">
             High-level horizons, marketing campaigns, and research sprints.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto flex-wrap sm:flex-nowrap">
           <SegmentedControl
             value={archiveFilter}
             onChange={setArchiveFilter}

@@ -42,45 +42,44 @@ function TaskRow({ task, isNow, onToggle, departments, projects }: TaskRowProps)
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: done ? 0.55 : 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-      className={`flex items-center gap-3 px-4 rounded-2xl cursor-pointer select-none group transition-colors ${
+      className={`flex items-center gap-2.5 sm:gap-3 px-3.5 sm:px-4 py-3 rounded-2xl cursor-pointer select-none group transition-colors min-h-[60px] sm:min-h-[64px] ${
         isNow
-          ? 'bg-charcoal text-white min-h-[64px] max-h-[96px]'
-          : 'bg-white/55 border border-black/[0.06] hover:bg-white/80 min-h-[64px]'
+          ? 'bg-charcoal text-white'
+          : 'bg-white/60 border border-black/[0.06] hover:bg-white/85'
       }`}
-      style={{ padding: '12px 16px' }}
       onClick={onToggle}
     >
       {/* Checkbox */}
       <button
         type="button"
-        className="shrink-0 focus:outline-none"
+        className="shrink-0 p-0.5 focus:outline-none"
         aria-label={done ? 'Mark incomplete' : 'Mark complete'}
       >
         {done ? (
-          <CheckCircle2 size={28} className={isNow ? 'text-lime' : 'text-lime'} />
+          <CheckCircle2 size={24} className="text-lime" />
         ) : (
-          <Circle size={28} className={isNow ? 'text-white/60 group-hover:text-white' : 'text-secondary group-hover:text-graphite'} />
+          <Circle size={24} className={isNow ? 'text-white/60 group-hover:text-white' : 'text-secondary group-hover:text-graphite'} />
         )}
       </button>
 
       {/* Title */}
-      <div className="flex-1 min-w-0">
-        <p className={`text-[17px] font-normal truncate leading-tight ${
+      <div className="flex-1 min-w-0 pr-1">
+        <p className={`text-sm sm:text-base font-normal truncate leading-snug ${
           done ? 'line-through' : ''
         } ${isNow ? 'text-white' : 'text-graphite'}`}>
           {task.title}
         </p>
         {/* Meta row */}
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
           {proj && (
-            <span className="flex items-center gap-1 text-xs" style={{ color: isNow ? 'rgba(255,255,255,0.65)' : 'var(--text-secondary)' }}>
+            <span className="flex items-center gap-1 text-[11px] sm:text-xs truncate max-w-[140px]" style={{ color: isNow ? 'rgba(255,255,255,0.65)' : 'var(--text-secondary)' }}>
               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: proj.color || deptColor }} />
-              {proj.name}
+              <span className="truncate">{proj.name}</span>
             </span>
           )}
           {dept && (
             <span
-              className="text-[11px] px-2 py-0.5 rounded-full font-normal"
+              className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-normal truncate max-w-[120px]"
               style={{
                 background: isNow ? 'rgba(255,255,255,0.12)' : `${deptColor}25`,
                 color: isNow ? 'rgba(255,255,255,0.75)' : deptColor,
@@ -93,19 +92,19 @@ function TaskRow({ task, isNow, onToggle, departments, projects }: TaskRowProps)
       </div>
 
       {/* Right side meta */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {task.estimate_min > 0 && (
-          <span className={`text-xs ${isNow ? 'text-white/60' : 'text-muted'}`}>
+          <span className={`text-[11px] sm:text-xs hidden sm:inline ${isNow ? 'text-white/60' : 'text-muted'}`}>
             {fmtMin(task.estimate_min)}
           </span>
         )}
         {task.due_date && (
-          <span className={`text-xs flex items-center gap-1 ${isNow ? 'text-white/60' : 'text-muted'}`}>
+          <span className={`text-[11px] sm:text-xs flex items-center gap-1 ${isNow ? 'text-white/60' : 'text-muted'}`}>
             <Clock size={11} /> {format(new Date(task.due_date), 'h:mm a')}
           </span>
         )}
         <span
-          className="text-[11px] px-2 py-0.5 rounded-full font-medium capitalize"
+          className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full font-medium capitalize"
           style={{
             background: isNow ? 'rgba(255,255,255,0.12)' : task.priority === 'urgent' ? 'var(--accent-coral)20' : task.priority === 'high' ? 'var(--accent-amber)20' : 'var(--accent-lime)20',
             color: isNow ? 'rgba(255,255,255,0.8)' : task.priority === 'urgent' ? 'var(--accent-coral)' : task.priority === 'high' ? 'var(--accent-amber)' : 'var(--color-charcoal)',
@@ -182,8 +181,8 @@ function MomentumRing({ done, planned }: { done: number; planned: number }) {
   const offset = c - (pct / 100) * c;
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative w-28 h-28">
+    <div className="flex flex-col items-center gap-3 w-full">
+      <div className="relative w-32 h-32 sm:w-36 sm:h-36 max-w-full">
         <svg viewBox="-56 -56 112 112" className="w-full h-full">
           <circle cx="0" cy="0" r={r} fill="none" stroke="rgba(27,29,31,0.08)" strokeWidth={8} />
           <circle
@@ -196,7 +195,7 @@ function MomentumRing({ done, planned }: { done: number; planned: number }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-light text-graphite">{pct}%</span>
+          <span className="text-2xl sm:text-3xl font-light text-graphite">{pct}%</span>
         </div>
       </div>
       <p className="text-xs text-secondary text-center">{done} of {total} tasks done</p>
@@ -254,24 +253,24 @@ export const Today: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* ─── Header ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="text-sm text-secondary">{format(now, 'EEEE, MMMM d')}</span>
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className="text-xs sm:text-sm text-secondary">{format(now, 'EEEE, MMMM d')}</span>
             <Chip label="In focus" accent="lime" size="sm" dot={false} />
-            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/55 border border-black/[0.07] text-xs text-graphite">
+            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/60 border border-black/[0.07] text-xs text-graphite">
               <Flame size={12} className="text-coral" />
               <span>3 day streak</span>
             </div>
           </div>
-          <h1 className="text-[44px] font-light tracking-tight text-graphite leading-[1.05]">Today</h1>
+          <h1 className="text-[clamp(32px,6vw,44px)] font-light tracking-tight text-graphite leading-[1.05]">Today</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
-            className="h-10 px-4 rounded-full bg-lime text-nearblack text-sm font-medium flex items-center gap-2 hover:bg-[var(--accent-lime-hover)] transition-colors"
+            className="flex-1 sm:flex-initial h-10 px-5 rounded-full bg-lime text-nearblack text-xs sm:text-sm font-medium flex items-center justify-center gap-2 hover:bg-[var(--accent-lime-hover)] active:scale-95 transition-all shadow-xs"
             onClick={() => {/* navigate to focus */}}
           >
-            <Zap size={14} /> Focus
+            <Zap size={14} /> <span>Start Focus</span>
           </button>
         </div>
       </div>

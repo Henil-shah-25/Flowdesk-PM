@@ -65,12 +65,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
       onClick={onClick}
       data-project-card={project.id}
       className={`flex flex-col justify-between transition-all ${
-        isSubProject ? 'p-5 sm:p-6' : 'p-6 sm:p-7'
+        isSubProject ? 'p-4 sm:p-6' : 'p-4 sm:p-7'
       }`}
     >
       <div>
         {/* Top Header: Dot, Type chip, Health badge, and Actions */}
-        <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap sm:flex-nowrap">
           <div className="flex items-center gap-2 flex-wrap">
             <span
               className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -96,7 +96,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0" onClick={(e) => e.stopPropagation()}>
             {onArchive && (
               <IconButton
                 icon={<Archive size={14} />}

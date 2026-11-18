@@ -173,22 +173,23 @@ export const Team: React.FC = () => {
   return (
     <div className="space-y-8 pb-12 max-w-7xl mx-auto">
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-2">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
-          <h1 className="text-[clamp(36px,4.5vw,56px)] font-light tracking-tight text-graphite leading-[1.08]">
+          <h1 className="text-[clamp(28px,6vw,44px)] sm:text-[clamp(36px,4.5vw,56px)] font-light tracking-tight text-graphite leading-[1.08]">
             Team & People
           </h1>
-          <p className="text-sm text-secondary mt-1.5">
+          <p className="text-xs sm:text-sm text-secondary mt-1.5 font-normal">
             Manage members, capacity, workload, leave, and team communication.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <Button
             variant="primary"
             size="md"
             icon={<UserPlus size={16} />}
             onClick={handleOpenAddMember}
+            className="w-full sm:w-auto justify-center"
           >
             Add member
           </Button>

@@ -494,17 +494,17 @@ export const Ideas: React.FC = () => {
       {/* =========================================================================
           HEADER (Title, Subtitle, Board/List toggle, and Capture Idea button)
          ========================================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pt-1">
         <div>
-          <h1 className="text-[clamp(52px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05]">
+          <h1 className="text-[clamp(30px,6vw,52px)] sm:text-[clamp(44px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05]">
             Ideas Whiteboard
           </h1>
-          <p className="text-sm sm:text-base text-secondary mt-1.5 font-normal">
+          <p className="text-xs sm:text-base text-secondary mt-1.5 font-normal">
             Infinite freeform canvas for concepts, spontaneous thoughts, and raw insights.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto flex-wrap sm:flex-nowrap">
           {/* Board | List toggle */}
           <div className="inline-flex rounded-full bg-black/[0.05] p-1 border border-white/50 text-xs">
             <button
@@ -748,7 +748,10 @@ export const Ideas: React.FC = () => {
           {/* =====================================================================
               FLOATING BOTTOM-CENTER TOOLBAR (Glass Pill)
              ===================================================================== */}
-          <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-40 bg-white/80 backdrop-blur-[24px] border border-white/70 shadow-[0_12px_40px_rgba(20,25,30,0.18)] rounded-full px-4 py-2 flex items-center gap-3">
+          <div
+            className="fixed left-1/2 -translate-x-1/2 z-40 bg-white/90 backdrop-blur-[24px] border border-white/80 shadow-[0_12px_40px_rgba(20,25,30,0.18)] rounded-full px-3 sm:px-4 py-1.5 sm:py-2 flex items-center gap-2 sm:gap-3 max-w-[94vw] overflow-x-auto no-scrollbar"
+            style={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom, 0px))' }}
+          >
             {/* Tool Selection: Select vs Hand */}
             <div className="flex items-center gap-1 pr-2 border-r border-black/[0.08]">
               <button

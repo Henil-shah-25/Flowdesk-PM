@@ -263,10 +263,10 @@ export function DepartmentPipeline() {
 
   return (
     <div className="space-y-6 max-w-full pb-14">
-      {/* Title & Stats Header (h1 at top: clamp(52px, 5.5vw, 76px)) */}
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+      {/* Title & Stats Header */}
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-5 pt-1">
         <div>
-          <h1 className="text-[clamp(52px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05]">
+          <h1 className="text-[clamp(28px,6vw,48px)] sm:text-[clamp(44px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05] break-words">
             <div>{parentDepartment ? parentDepartment.name : currentDepartment.name} /</div>
             <div className="text-graphite/80">{isSubDept ? currentDepartment.name : 'Pipeline'}</div>
           </h1>

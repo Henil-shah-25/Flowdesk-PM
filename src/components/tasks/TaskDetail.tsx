@@ -298,7 +298,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
           </div>
 
           {/* Top Bar: Project chip + Priority chip + Saved indicator + Close button */}
-          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+          <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3">
             <div className="flex items-center gap-2 flex-wrap">
               {project && (
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/60 border border-black/[0.06] text-xs font-normal">
@@ -373,7 +373,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
           </div>
 
           {/* Scrollable Content Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-2 space-y-6">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-2 space-y-5 sm:space-y-6 pb-[calc(1.75rem+env(safe-area-inset-bottom,0px))]">
             {/* Title: 32px weight-500 */}
             <div>
               <input

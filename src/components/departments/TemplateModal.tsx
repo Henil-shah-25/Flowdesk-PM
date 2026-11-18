@@ -559,10 +559,10 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.96, opacity: 0, y: 12 }}
           transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-          className="relative w-full max-w-[760px] max-h-[90vh] bg-[#F2F3EF] rounded-[30px] border border-black/[0.08] shadow-[0_20px_40px_-22px_rgba(20,25,30,0.28)] flex flex-col overflow-hidden text-graphite z-10"
+          className="relative w-full max-w-[760px] max-h-[90vh] bg-[#F2F3EF] rounded-[24px] sm:rounded-[30px] border border-black/[0.08] shadow-[0_20px_40px_-22px_rgba(20,25,30,0.28)] flex flex-col overflow-hidden text-graphite z-10"
         >
           {/* Header */}
-          <div className="px-6 pt-5 pb-4 border-b border-black/[0.06] flex items-center justify-between gap-3">
+          <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-black/[0.06] flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full bg-white/70 border border-black/[0.07] flex items-center justify-center text-graphite shrink-0 shadow-xs">
                 <BookOpen size={18} />
@@ -1007,12 +1007,12 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-black/[0.07] bg-[#EDEFEA] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-black/[0.07] bg-[#EDEFEA] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             {/* Stats & Allow Duplicates Toggle */}
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center justify-between sm:justify-start gap-3 flex-wrap">
               <span className="text-xs text-secondary font-medium">
                 {selectedTaskIds.size} task{selectedTaskIds.size === 1 ? '' : 's'} selected
-                {selectedTaskIds.size > 0 && ` (${totalTimeFormatted} total)`}
+                {selectedTaskIds.size > 0 && ` (${totalTimeFormatted})`}
               </span>
 
               <label className="flex items-center gap-1.5 text-xs text-secondary hover:text-graphite cursor-pointer select-none">
@@ -1027,14 +1027,14 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
             </div>
 
             {/* Destination Stage & Action Buttons */}
-            <div className="flex items-center gap-2.5 justify-end">
+            <div className="flex items-center gap-2 justify-end flex-wrap sm:flex-nowrap">
               {targetStages.length > 0 && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
                   <span className="text-xs text-secondary hidden md:inline">To:</span>
                   <select
                     value={selectedStageId}
                     onChange={(e) => setSelectedStageId(e.target.value)}
-                    className="h-9 px-3 text-xs rounded-full bg-white/80 border border-black/[0.08] text-graphite focus:outline-none focus:ring-2 focus:ring-nearblack/20"
+                    className="h-9 px-3 text-xs rounded-full bg-white/80 border border-black/[0.08] text-graphite focus:outline-none focus:ring-2 focus:ring-nearblack/20 w-full sm:w-auto"
                   >
                     {targetStages.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1048,7 +1048,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="h-9 px-4 rounded-full border border-black/[0.08] bg-white/60 text-xs font-normal text-secondary hover:text-graphite transition-colors"
+                className="h-9 px-4 rounded-full border border-black/[0.08] bg-white/60 text-xs font-normal text-secondary hover:text-graphite transition-colors flex-1 sm:flex-initial justify-center"
               >
                 Cancel
               </button>
@@ -1057,7 +1057,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
                 type="button"
                 disabled={selectedTaskIds.size === 0}
                 onClick={handleImport}
-                className="h-9 px-5 rounded-full bg-lime text-nearblack text-xs font-medium hover:bg-[var(--accent-lime-hover)] disabled:opacity-40 transition-all shadow-xs flex items-center gap-1.5"
+                className="h-9 px-4 sm:px-5 rounded-full bg-lime text-nearblack text-xs font-medium hover:bg-[var(--accent-lime-hover)] disabled:opacity-40 transition-all shadow-xs flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
               >
                 <span>Import {selectedTaskIds.size > 0 ? selectedTaskIds.size : ''} tasks</span>
               </button>

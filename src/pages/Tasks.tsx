@@ -311,68 +311,68 @@ export function Tasks() {
   return (
     <div className="space-y-8 max-w-full pb-16">
       {/* Page Header: Title + Real Subtitle + 4 Stat Tiles */}
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-5 pt-1">
         <div>
-          <h1 className="text-[clamp(52px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05]">
+          <h1 className="text-[clamp(32px,6vw,52px)] sm:text-[clamp(44px,5.5vw,76px)] font-light tracking-[-0.02em] text-graphite leading-[1.05]">
             Tasks
           </h1>
-          <p className="text-sm sm:text-base text-secondary mt-2 font-normal">
+          <p className="text-xs sm:text-base text-secondary mt-1.5 sm:mt-2 font-normal">
             {stats.openCount} open across {stats.activeProjectCount || projects.length} project
             {stats.activeProjectCount !== 1 ? 's' : ''}
           </p>
         </div>
 
         {/* 4 Stat Tiles: Open, Due this week, Overdue, Done this week */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 xl:gap-4 shrink-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 shrink-0">
           {/* Open */}
-          <div data-stat-tile="open" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[24px] p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white/70 border border-white/80 flex items-center justify-center text-graphite shrink-0 shadow-xs">
-              <CheckSquare size={18} />
+          <div data-stat-tile="open" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/70 border border-white/80 flex items-center justify-center text-graphite shrink-0 shadow-xs">
+              <CheckSquare size={17} />
             </div>
-            <div>
-              <p className="text-[28px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
+            <div className="min-w-0">
+              <p className="text-[24px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
                 <CountUp value={stats.openCount} duration={700} />
               </p>
-              <p className="text-xs text-secondary mt-1 font-normal">Open</p>
+              <p className="text-[11px] sm:text-xs text-secondary mt-1 font-normal truncate">Open</p>
             </div>
           </div>
 
           {/* Due this week */}
-          <div data-stat-tile="due-this-week" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[24px] p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-sky/20 border border-sky/30 flex items-center justify-center text-blue-700 shrink-0 shadow-xs">
-              <Clock size={18} />
+          <div data-stat-tile="due-this-week" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-sky/20 border border-sky/30 flex items-center justify-center text-blue-700 shrink-0 shadow-xs">
+              <Clock size={17} />
             </div>
-            <div>
-              <p className="text-[28px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
+            <div className="min-w-0">
+              <p className="text-[24px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
                 <CountUp value={stats.dueThisWeekCount} duration={700} />
               </p>
-              <p className="text-xs text-secondary mt-1 font-normal">Due this week</p>
+              <p className="text-[11px] sm:text-xs text-secondary mt-1 font-normal truncate">Due week</p>
             </div>
           </div>
 
           {/* Overdue */}
-          <div data-stat-tile="overdue" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[24px] p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-coral/20 border border-coral/30 flex items-center justify-center text-coral shrink-0 shadow-xs">
-              <AlertTriangle size={18} />
+          <div data-stat-tile="overdue" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-coral/20 border border-coral/30 flex items-center justify-center text-coral shrink-0 shadow-xs">
+              <AlertTriangle size={17} />
             </div>
-            <div>
-              <p className="text-[28px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
+            <div className="min-w-0">
+              <p className="text-[24px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
                 <CountUp value={stats.overdueCount} duration={700} />
               </p>
-              <p className="text-xs text-secondary mt-1 font-normal">Overdue</p>
+              <p className="text-[11px] sm:text-xs text-secondary mt-1 font-normal truncate">Overdue</p>
             </div>
           </div>
 
           {/* Done this week */}
-          <div data-stat-tile="done-this-week" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[24px] p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-lime/30 border border-lime/40 flex items-center justify-center text-graphite shrink-0 shadow-xs">
-              <CheckCircle2 size={18} />
+          <div data-stat-tile="done-this-week" className="bg-panel backdrop-blur-[20px] border border-white/60 shadow-glass rounded-[22px] sm:rounded-[24px] p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-lime/30 border border-lime/40 flex items-center justify-center text-graphite shrink-0 shadow-xs">
+              <CheckCircle2 size={17} />
             </div>
-            <div>
-              <p className="text-[28px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
+            <div className="min-w-0">
+              <p className="text-[24px] sm:text-[34px] font-light text-graphite leading-none tracking-tight">
                 <CountUp value={stats.doneThisWeekCount} duration={700} />
               </p>
-              <p className="text-xs text-secondary mt-1 font-normal">Done this week</p>
+              <p className="text-[11px] sm:text-xs text-secondary mt-1 font-normal truncate">Done week</p>
             </div>
           </div>
         </div>

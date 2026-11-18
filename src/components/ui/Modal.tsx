@@ -60,7 +60,7 @@ export const Modal: React.FC<ModalProps> = ({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            className={`relative w-full ${maxWidthClasses[maxWidth]} bg-white/75 backdrop-blur-[24px] border border-white/70 shadow-[0_20px_60px_rgba(30,35,40,0.14)] rounded-t-[32px] sm:rounded-[32px] overflow-hidden max-h-[85vh] flex flex-col z-10`}
+            className={`relative w-full ${maxWidthClasses[maxWidth]} bg-white/85 backdrop-blur-[24px] border border-white/80 shadow-[0_20px_60px_rgba(30,35,40,0.18)] rounded-t-[32px] sm:rounded-[32px] overflow-hidden max-h-[90vh] flex flex-col z-10`}
           >
             {/* Mobile Sheet Handle */}
             <div className="sm:hidden flex justify-center pt-3 pb-1">
@@ -69,10 +69,10 @@ export const Modal: React.FC<ModalProps> = ({
 
             {/* Header */}
             {(title || description) && (
-              <div className="px-7 pt-6 pb-4 flex items-start justify-between border-b border-black/[0.06]">
+              <div className="px-5 sm:px-7 pt-5 sm:pt-6 pb-3.5 sm:pb-4 flex items-start justify-between border-b border-black/[0.06]">
                 <div>
                   {title && (
-                    <h3 className="text-xl font-normal tracking-tighter text-graphite">
+                    <h3 className="text-xl font-normal tracking-tight text-graphite">
                       {title}
                     </h3>
                   )}
@@ -93,7 +93,7 @@ export const Modal: React.FC<ModalProps> = ({
             )}
 
             {/* Content body */}
-            <div className="p-7 overflow-y-auto">{children}</div>
+            <div className="p-5 sm:p-7 overflow-y-auto pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">{children}</div>
           </motion.div>
         </div>
       )}

@@ -35,9 +35,9 @@ export const TasksFilterBar: React.FC<TasksFilterBarProps> = ({
   return (
     <div className="bg-white/45 backdrop-blur-[24px] border border-white/65 shadow-glass rounded-[28px] p-3 sm:p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
       {/* Filters cluster */}
-      <div className="flex items-center gap-2.5 flex-wrap flex-1">
+      <div className="flex items-center gap-2 flex-wrap flex-1 w-full">
         {/* Search input */}
-        <div className="relative min-w-[200px] flex-1 sm:flex-initial">
+        <div className="relative min-w-[160px] flex-1">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary pointer-events-none" />
           <input
             type="text"
@@ -104,7 +104,7 @@ export const TasksFilterBar: React.FC<TasksFilterBarProps> = ({
       </div>
 
       {/* View Mode Toggle + New Task Button */}
-      <div className="flex items-center gap-3 shrink-0 self-end xl:self-auto">
+      <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 w-full xl:w-auto pt-2 xl:pt-0 border-t xl:border-t-0 border-black/[0.04]">
         <SegmentedControl
           value={viewMode}
           onChange={onViewModeChange}

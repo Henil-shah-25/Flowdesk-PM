@@ -351,6 +351,7 @@ export const Calendar: React.FC = () => {
 
   // Modal / Bottom Sheet States
   const [selectedDayForSheet, setSelectedDayForSheet] = useState<Date | null>(null);
+  const [selectedMobileDay, setSelectedMobileDay] = useState<Date>(new Date());
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [prefilledDate, setPrefilledDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -803,17 +804,17 @@ export const Calendar: React.FC = () => {
           {/* ---------------------------------------------------------------------
               CALENDAR PANEL (Left: minmax(0,1fr), nearly full viewport height)
              --------------------------------------------------------------------- */}
-          <div className="rounded-[32px] bg-panel backdrop-blur-[24px] border border-white/55 p-5 sm:p-7 shadow-glass space-y-5 min-h-[calc(100vh-220px)] flex flex-col justify-between">
+          <div className="rounded-[32px] bg-panel backdrop-blur-[24px] border border-white/55 p-3.5 sm:p-7 shadow-glass space-y-4 sm:space-y-5 min-h-[calc(100vh-220px)] flex flex-col justify-between">
             <div>
               {/* Calendar Panel Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-black/[0.04]">
                 {/* Panel Title & Nav Buttons */}
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl sm:text-2xl font-light tracking-tight text-graphite min-w-[180px]">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap justify-between sm:justify-start w-full sm:w-auto">
+                  <h2 className="text-lg sm:text-2xl font-light tracking-tight text-graphite truncate">
                     {format(currentDate, viewMode === 'month' ? 'MMMM yyyy' : "'Week of' MMM d, yyyy")}
                   </h2>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <IconButton
                       icon={<ChevronLeft size={16} />}
                       aria-label="Previous"
@@ -826,15 +827,14 @@ export const Calendar: React.FC = () => {
                       size="sm"
                       onClick={handleNext}
                     />
+                    <button
+                      type="button"
+                      onClick={handleTodayClick}
+                      className="px-3 py-1 rounded-full text-xs font-medium bg-white/60 hover:bg-white/90 border border-white/60 text-graphite transition-all shadow-xs active:scale-95"
+                    >
+                      Today
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={handleTodayClick}
-                    className="px-3.5 py-1 rounded-full text-xs font-medium bg-white/55 hover:bg-white/80 border border-white/60 text-graphite transition-all shadow-sm"
-                  >
-                    Today
-                  </button>
                 </div>
 
                 {/* Month | Week segmented toggle & More Options */}
@@ -874,7 +874,7 @@ export const Calendar: React.FC = () => {
               </div>
 
               {/* -----------------------------------------------------------------
-                  MONTH VIEW (Day cells min-height 150px, 10px gaps, 24px radius)
+                  MONTH VIEW (Desktop: full 150px grid; Mobile: native compact month + agenda)
                  ----------------------------------------------------------------- */}
               {viewMode === 'month' && (
                 <AnimatePresence mode="wait" initial={false}>
@@ -884,37 +884,191 @@ export const Calendar: React.FC = () => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: slideDirection * -20 }}
                     transition={{ duration: 0.22, ease: 'easeOut' }}
-                    className="space-y-2.5 pt-3"
+                    className="space-y-4 pt-2"
                   >
-                    {/* Weekday labels: 14px */}
-                    <div className="grid grid-cols-7 gap-[10px] text-center text-[14px] font-medium text-secondary py-1">
-                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName) => (
-                        <div key={dayName} className="truncate">
-                          {dayName}
-                        </div>
-                      ))}
-                    </div>
+                    {/* MOBILE CALENDAR VIEW (<md): Compact Date Grid + Day Agenda */}
+                    <div className="md:hidden space-y-4">
+                      {/* Weekday abbreviations */}
+                      <div className="grid grid-cols-7 text-center text-xs font-medium text-secondary py-1">
+                        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((dayAbbr, idx) => (
+                          <div key={idx} className="py-1">
+                            {dayAbbr}
+                          </div>
+                        ))}
+                      </div>
 
-                    {/* Month Grid: 10px gaps, day cells min-height 150px (160px at 1440px+) */}
-                    <div className="grid grid-cols-7 gap-[10px]">
-                      {monthDays.map((day) => {
-                        const dayKey = format(day, 'yyyy-MM-dd');
-                        const dayTasks = tasksByDay.get(dayKey) || [];
+                      {/* Compact Day Chips Grid */}
+                      <div className="grid grid-cols-7 gap-1">
+                        {monthDays.map((day) => {
+                          const dayKey = format(day, 'yyyy-MM-dd');
+                          const dayTasks = tasksByDay.get(dayKey) || [];
+                          const isCurrentMonth = isSameMonth(day, currentDate);
+                          const isDayToday = isToday(day);
+                          const isSelected = format(day, 'yyyy-MM-dd') === format(selectedMobileDay, 'yyyy-MM-dd');
+
+                          return (
+                            <button
+                              key={`mobile_${dayKey}`}
+                              type="button"
+                              onClick={() => setSelectedMobileDay(day)}
+                              className={`h-11 rounded-2xl flex flex-col items-center justify-center p-1 relative transition-all active:scale-95 ${
+                                isSelected
+                                  ? 'bg-nearblack text-white shadow-sm'
+                                  : isDayToday
+                                  ? 'bg-white/80 text-nearblack font-semibold border border-lime ring-1 ring-lime/50'
+                                  : 'hover:bg-white/60 text-graphite'
+                              } ${!isCurrentMonth ? 'opacity-30' : ''}`}
+                            >
+                              <span className="text-xs sm:text-sm font-normal leading-none">
+                                {format(day, 'd')}
+                              </span>
+                              {/* Task dots */}
+                              {dayTasks.length > 0 && (
+                                <div className="flex items-center gap-0.5 mt-1">
+                                  {dayTasks.slice(0, 3).map((t, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="w-1 h-1 rounded-full shrink-0"
+                                      style={{
+                                        backgroundColor: isSelected
+                                          ? '#BBD85A'
+                                          : departmentMap.get(t.department_id)?.color || '#8DB3DE',
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Selected Day Agenda */}
+                      {(() => {
+                        const selectedKey = format(selectedMobileDay, 'yyyy-MM-dd');
+                        const selectedDayTasks = tasksByDay.get(selectedKey) || [];
 
                         return (
-                          <MonthDayCell
-                            key={dayKey}
-                            day={day}
-                            currentDate={currentDate}
-                            dayTasks={dayTasks}
-                            projectMap={projectMap}
-                            departmentMap={departmentMap}
-                            onOpenQuickAdd={handleOpenQuickAdd}
-                            onOpenDaySheet={setSelectedDayForSheet}
-                            onOpenDrawer={setSelectedTaskForDrawer}
-                          />
+                          <div className="pt-3 border-t border-black/[0.06] space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="text-sm font-medium text-graphite">
+                                  {format(selectedMobileDay, 'EEEE, MMM d')}
+                                </h3>
+                                <p className="text-[11px] text-secondary">
+                                  {selectedDayTasks.length} task{selectedDayTasks.length === 1 ? '' : 's'} scheduled
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenQuickAdd(selectedKey)}
+                                className="px-3 py-1 rounded-full text-xs font-medium bg-lime text-nearblack hover:bg-[var(--accent-lime-hover)] transition-all shadow-xs flex items-center gap-1 active:scale-95"
+                              >
+                                <Plus size={13} />
+                                <span>Add task</span>
+                              </button>
+                            </div>
+
+                            <div className="space-y-2">
+                              {selectedDayTasks.length === 0 ? (
+                                <div className="p-4 rounded-2xl bg-white/40 border border-black/[0.04] text-center text-xs text-secondary">
+                                  No tasks scheduled for this day
+                                </div>
+                              ) : (
+                                selectedDayTasks.map((task) => {
+                                  const isDone = Boolean(task.done_at);
+                                  const dept = departmentMap.get(task.department_id);
+                                  const proj = projectMap.get(task.project_id);
+
+                                  return (
+                                    <div
+                                      key={task.id}
+                                      onClick={() => setSelectedTaskForDrawer(task)}
+                                      className={`p-3 rounded-2xl bg-white/70 border border-black/[0.05] shadow-xs flex items-center gap-2.5 transition-all active:scale-[0.99] cursor-pointer ${
+                                        isDone ? 'opacity-50 line-through' : ''
+                                      }`}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleToggleTask(task);
+                                        }}
+                                        className="shrink-0 p-0.5"
+                                        aria-label={isDone ? 'Mark incomplete' : 'Mark complete'}
+                                      >
+                                        {isDone ? (
+                                          <Check size={16} className="text-lime" />
+                                        ) : (
+                                          <span
+                                            className="w-4 h-4 rounded-full border border-black/30 block"
+                                          />
+                                        )}
+                                      </button>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-normal text-graphite truncate">
+                                          {task.title}
+                                        </p>
+                                        <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-secondary">
+                                          {proj && <span className="truncate">{proj.name}</span>}
+                                          {dept && (
+                                            <>
+                                              <span>•</span>
+                                              <span style={{ color: dept.color || '#8DB3DE' }}>
+                                                {dept.name}
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {task.due_date && (
+                                        <span className="text-[10px] text-muted shrink-0 flex items-center gap-1">
+                                          <Clock size={10} />
+                                          {format(new Date(task.due_date), 'h:mm a')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
                         );
-                      })}
+                      })()}
+                    </div>
+
+                    {/* DESKTOP CALENDAR VIEW (md:block): Full 150px Grid */}
+                    <div className="hidden md:block space-y-2.5">
+                      {/* Weekday labels: 14px */}
+                      <div className="grid grid-cols-7 gap-[10px] text-center text-[14px] font-medium text-secondary py-1">
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName) => (
+                          <div key={dayName} className="truncate">
+                            {dayName}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Month Grid: 10px gaps, day cells min-height 150px (160px at 1440px+) */}
+                      <div className="grid grid-cols-7 gap-[10px]">
+                        {monthDays.map((day) => {
+                          const dayKey = format(day, 'yyyy-MM-dd');
+                          const dayTasks = tasksByDay.get(dayKey) || [];
+
+                          return (
+                            <MonthDayCell
+                              key={dayKey}
+                              day={day}
+                              currentDate={currentDate}
+                              dayTasks={dayTasks}
+                              projectMap={projectMap}
+                              departmentMap={departmentMap}
+                              onOpenQuickAdd={handleOpenQuickAdd}
+                              onOpenDaySheet={setSelectedDayForSheet}
+                              onOpenDrawer={setSelectedTaskForDrawer}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   </motion.div>
                 </AnimatePresence>
@@ -967,8 +1121,8 @@ export const Calendar: React.FC = () => {
                       ))}
                     </div>
 
-                    {/* 7 Day Columns */}
-                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-7 gap-3">
+                    {/* 7 Day Columns — Swipable on mobile, 7-col grid on tablet/desktop */}
+                    <div className="flex-1 flex sm:grid sm:grid-cols-7 gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2">
                       {weekDays.map((day) => {
                         const dayKey = format(day, 'yyyy-MM-dd');
                         const dayTasks = tasksByDay.get(dayKey) || [];
@@ -977,7 +1131,7 @@ export const Calendar: React.FC = () => {
                         return (
                           <div
                             key={dayKey}
-                            className={`rounded-[24px] p-3 border flex flex-col justify-between min-h-[480px] relative ${
+                            className={`min-w-[240px] sm:min-w-0 flex-1 shrink-0 snap-start rounded-[24px] p-3 border flex flex-col justify-between min-h-[480px] relative transition-all ${
                               isDayToday
                                 ? 'bg-charcoal text-white border-charcoal shadow-md'
                                 : 'bg-inner-surface text-graphite border-white/60'

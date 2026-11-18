@@ -214,70 +214,70 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-6 sm:space-y-8 pb-10">
       {/* ─── Greeting Row ─── */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pt-2">
-        <div>
-          <p className="text-sm text-secondary mb-1">{format(now, 'EEEE, MMMM d')}</p>
-          <h1 className="text-[clamp(36px,4.5vw,56px)] font-light tracking-tight text-graphite leading-[1.08]">
-            {getGreeting()}, <span className="font-medium">Henil</span>
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 pt-1">
+        <div className="min-w-0">
+          <p className="text-xs sm:text-sm text-secondary mb-1 font-normal tracking-wide uppercase sm:normal-case">{format(now, 'EEEE, MMMM d')}</p>
+          <h1 className="text-[clamp(28px,7vw,42px)] sm:text-[clamp(36px,4.5vw,56px)] font-light tracking-tight text-graphite leading-[1.1] break-words">
+            {getGreeting()}, <span className="font-medium whitespace-nowrap">Henil</span>
           </h1>
-          <p className="text-sm text-secondary mt-1.5">
+          <p className="text-xs sm:text-sm text-secondary mt-1.5 font-normal">
             {plannedToday.length > 0
               ? `${plannedToday.length} task${plannedToday.length > 1 ? 's' : ''} left today`
               : 'All clear for today 🎉'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button
             onClick={() => setIsModalOpen(true)}
-            className="h-11 px-5 rounded-full border border-black/[0.08] bg-white/60 text-sm font-normal text-graphite flex items-center gap-2 hover:bg-white/80 transition-colors"
+            className="flex-1 sm:flex-initial h-11 px-4 sm:px-5 rounded-full border border-black/[0.08] bg-white/70 text-xs sm:text-sm font-normal text-graphite flex items-center justify-center gap-2 hover:bg-white/90 active:scale-[0.98] transition-all shadow-xs"
           >
-            <Plus size={15} /> New task
+            <Plus size={16} /> <span>New task</span>
           </button>
           <button
             onClick={() => navigate('/focus')}
-            className="h-11 px-5 rounded-full bg-lime text-nearblack text-sm font-medium flex items-center gap-2 hover:bg-[var(--accent-lime-hover)] transition-colors"
+            className="flex-1 sm:flex-initial h-11 px-4 sm:px-5 rounded-full bg-lime text-nearblack text-xs sm:text-sm font-medium flex items-center justify-center gap-2 hover:bg-[var(--accent-lime-hover)] active:scale-[0.98] transition-all shadow-xs"
           >
-            <Zap size={15} /> Start focus
+            <Zap size={15} /> <span>Start focus</span>
           </button>
         </div>
       </div>
 
-      {/* ─── Stat tiles ─── */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* ─── Stat tiles (KPI Cards) ─── */}
+      <div className="flex sm:grid sm:grid-cols-3 gap-3 sm:gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1 -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
         {[
           { label: 'Done today', value: `${doneToday.length}/${doneToday.length + plannedToday.length}`, icon: <CheckCircle2 size={18} className="text-lime" />, sub: 'tasks completed' },
           { label: 'Focus today', value: fmtMin(focusMinToday), icon: <Clock size={18} className="text-coral" />, sub: 'of 8h target' },
-          { label: 'Overdue', value: overdue.length, icon: <AlertCircle size={18} className="text-amber" />, sub: overdue.length === 0 ? 'you\'re on time' : 'need attention' },
+          { label: 'Overdue', value: overdue.length, icon: <AlertCircle size={18} className="text-amber" />, sub: overdue.length === 0 ? "you're on time" : 'need attention' },
         ].map((tile, i) => (
-          <GlassCard key={i} className="!p-5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-white/60 border border-black/[0.07] flex items-center justify-center shrink-0">
+          <GlassCard key={i} className="!p-4 sm:!p-5 flex items-center gap-3.5 shrink-0 snap-start w-[72vw] max-w-[280px] sm:w-auto sm:max-w-none">
+            <div className="w-10 h-10 rounded-full bg-white/70 border border-black/[0.06] flex items-center justify-center shrink-0 shadow-xs">
               {tile.icon}
             </div>
-            <div className="min-w-0">
-              <div className="text-[11px] text-secondary mb-0.5">{tile.label}</div>
-              <div className="text-xl font-light text-graphite tabular-nums leading-tight">{tile.value}</div>
-              <div className="text-[10px] text-muted mt-0.5">{tile.sub}</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] text-secondary mb-0.5 truncate">{tile.label}</div>
+              <div className="text-lg sm:text-xl font-light text-graphite tabular-nums leading-tight">{tile.value}</div>
+              <div className="text-[10px] text-muted mt-0.5 truncate">{tile.sub}</div>
             </div>
           </GlassCard>
         ))}
       </div>
 
       {/* ─── Three cards row: Today rings | Up next | Focus ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
         {/* Today rings */}
-        <GlassCard className="!p-6 flex flex-col items-center gap-4">
+        <GlassCard className="!p-5 sm:!p-6 flex flex-col items-center gap-4">
           <div className="text-sm font-medium text-graphite self-start">Today</div>
-          <div className="relative">
-            <svg viewBox="-72 -72 144 144" className="w-36 h-36">
+          <div className="relative flex items-center justify-center w-full my-1">
+            <svg viewBox="-72 -72 144 144" className="w-32 h-32 sm:w-36 sm:h-36 max-w-full">
               <g>
                 {rings.map((ring, i) => (
                   <Ring key={i} value={ring.value} color={ring.color} radius={ring.r} stroke={ring.s} />
                 ))}
               </g>
               <text x="0" y="4" textAnchor="middle" dominantBaseline="middle"
-                fontSize="20" fontWeight="300" fill="var(--text-graphite)"
+                fontSize="22" fontWeight="300" fill="var(--text-graphite)"
               >
                 {momentumPct}%
               </text>
@@ -286,50 +286,50 @@ export const Dashboard: React.FC = () => {
           <div className="w-full space-y-1.5">
             {rings.map((ring, i) => (
               <div key={i} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ background: ring.color }} />
-                  <span className="text-secondary">{ring.label}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: ring.color }} />
+                  <span className="text-secondary truncate">{ring.label}</span>
                 </div>
-                <span className="font-medium text-graphite">{Math.round(ring.value)}%</span>
+                <span className="font-medium text-graphite tabular-nums shrink-0">{Math.round(ring.value)}%</span>
               </div>
             ))}
           </div>
         </GlassCard>
 
         {/* Up next */}
-        <GlassCard className="!p-6 flex flex-col gap-4">
+        <GlassCard className="!p-5 sm:!p-6 flex flex-col gap-4">
           <div className="text-sm font-medium text-graphite">Up next</div>
           {tasksLoading ? (
             <div className="flex-1 flex items-center justify-center text-secondary text-xs">Loading…</div>
           ) : upNext ? (
             <div className="flex-1 flex flex-col justify-between">
               <div>
-                <div className="flex items-start gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Chip
                     label={upNext.priority}
                     accent={upNext.priority === 'urgent' ? 'coral' : upNext.priority === 'high' ? 'amber' : 'lime'}
                     size="sm"
                   />
                   {upNext.due_date && (
-                    <span className="text-xs text-secondary flex items-center gap-1 mt-0.5">
+                    <span className="text-xs text-secondary flex items-center gap-1">
                       <Clock size={11} /> {format(new Date(upNext.due_date), 'h:mm a')}
                     </span>
                   )}
                 </div>
-                <p className="text-base font-normal text-graphite leading-snug">{upNext.title}</p>
+                <p className="text-base font-normal text-graphite leading-snug line-clamp-2">{upNext.title}</p>
                 {upNext.estimate_min && (
                   <p className="text-xs text-secondary mt-1">{fmtMin(upNext.estimate_min)} estimated</p>
                 )}
               </div>
               <button
                 onClick={() => navigate('/today')}
-                className="mt-4 h-9 px-4 rounded-full bg-charcoal text-white text-xs font-normal flex items-center gap-1.5 self-start hover:bg-charcoal/90 transition-colors"
+                className="mt-4 h-9 px-4 rounded-full bg-charcoal text-white text-xs font-normal flex items-center gap-1.5 self-start hover:bg-charcoal/90 active:scale-95 transition-all"
               >
                 Open task <ArrowUpRight size={12} />
               </button>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-secondary">
+            <div className="flex-1 flex flex-col items-center justify-center gap-2 text-secondary py-6">
               <CheckCircle2 size={28} className="text-lime opacity-60" />
               <p className="text-sm">Nothing scheduled for today</p>
             </div>
@@ -337,16 +337,16 @@ export const Dashboard: React.FC = () => {
         </GlassCard>
 
         {/* Focus timer */}
-        <GlassCard className="!p-6 flex flex-col gap-4">
+        <GlassCard className="!p-5 sm:!p-6 flex flex-col gap-4">
           <div className="text-sm font-medium text-graphite">Focus timer</div>
           <MiniFocusTimer />
         </GlassCard>
       </div>
 
       {/* ─── My Tasks + This Week ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
         {/* My tasks (due today + overdue) */}
-        <GlassCard className="!p-6 space-y-4">
+        <GlassCard className="!p-5 sm:!p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-graphite">My tasks</h3>
             <button onClick={() => navigate('/today')} className="text-xs text-secondary hover:text-graphite flex items-center gap-0.5">
@@ -365,22 +365,22 @@ export const Dashboard: React.FC = () => {
                 return (
                   <div
                     key={task.id}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-white/55 border border-black/[0.06] transition-opacity ${done ? 'opacity-50' : ''}`}
+                    className={`flex items-center gap-2.5 sm:gap-3 px-3 py-2.5 rounded-2xl bg-white/60 border border-black/[0.06] transition-opacity ${done ? 'opacity-50' : ''}`}
                   >
-                    <button onClick={() => toggleTask(task)} className="shrink-0">
+                    <button onClick={() => toggleTask(task)} className="shrink-0 p-0.5" aria-label={done ? 'Mark pending' : 'Mark done'}>
                       {done
                         ? <CheckCircle2 size={20} className="text-lime" />
                         : <Circle size={20} className="text-secondary hover:text-graphite" />
                       }
                     </button>
-                    <span className={`flex-1 text-sm text-graphite truncate font-normal ${done ? 'line-through text-secondary' : ''}`}>
+                    <span className={`flex-1 min-w-0 text-xs sm:text-sm text-graphite truncate font-normal ${done ? 'line-through text-secondary' : ''}`}>
                       {task.title}
                     </span>
                     {isOvd && !done && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-coral/15 text-coral font-medium shrink-0">Overdue</span>
                     )}
                     {task.estimate_min > 0 && (
-                      <span className="text-xs text-muted shrink-0">{fmtMin(task.estimate_min)}</span>
+                      <span className="text-xs text-muted shrink-0 hidden sm:inline">{fmtMin(task.estimate_min)}</span>
                     )}
                   </div>
                 );
@@ -390,7 +390,7 @@ export const Dashboard: React.FC = () => {
         </GlassCard>
 
         {/* This week bars */}
-        <GlassCard className="!p-6 space-y-4">
+        <GlassCard className="!p-5 sm:!p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-graphite">This week</h3>
             <span className="text-xs text-secondary">{doneThisWeek.length}/{plannedThisWeek.length} done</span>
@@ -400,9 +400,9 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* ─── Projects health + Ideas + Time donut ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
         {/* Projects health */}
-        <GlassCard className="!p-6 space-y-3">
+        <GlassCard className="!p-5 sm:!p-6 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-graphite">Projects</h3>
             <button onClick={() => navigate('/projects')} className="text-xs text-secondary hover:text-graphite flex items-center gap-0.5">
@@ -424,11 +424,11 @@ export const Dashboard: React.FC = () => {
                     <div
                       key={project.id}
                       onClick={() => navigate(`/projects/${project.id}`)}
-                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl bg-white/55 border border-black/[0.06] cursor-pointer hover:bg-white/80 transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-2xl bg-white/60 border border-black/[0.06] cursor-pointer hover:bg-white/80 active:scale-[0.99] transition-all"
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
-                      <span className="flex-1 text-sm text-graphite truncate font-normal">{project.name}</span>
-                      <div className="w-16">
+                      <span className="flex-1 text-xs sm:text-sm text-graphite truncate font-normal">{project.name}</span>
+                      <div className="w-16 shrink-0">
                         <ProgressBar value={health.progressPercent} accent="lime" size="sm" />
                       </div>
                     </div>
@@ -439,7 +439,7 @@ export const Dashboard: React.FC = () => {
         </GlassCard>
 
         {/* Ideas */}
-        <GlassCard className="!p-6 space-y-3">
+        <GlassCard className="!p-5 sm:!p-6 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-graphite">Ideas</h3>
             <button onClick={() => navigate('/ideas')} className="text-xs text-secondary hover:text-graphite flex items-center gap-0.5">
@@ -448,10 +448,10 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="space-y-2">
             {ideas.slice(0, 4).map((idea: Idea) => (
-              <div key={idea.id} className="flex items-start gap-2.5 px-3 py-2.5 rounded-2xl bg-white/55 border border-black/[0.06]">
+              <div key={idea.id} className="flex items-start gap-2.5 px-3 py-2.5 rounded-2xl bg-white/60 border border-black/[0.06]">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0 mt-1.5" />
                 <div className="min-w-0">
-                  <p className="text-sm text-graphite truncate font-normal">{idea.title}</p>
+                  <p className="text-xs sm:text-sm text-graphite truncate font-normal">{idea.title}</p>
                   {idea.body && (
                     <p className="text-xs text-secondary line-clamp-1 mt-0.5">{idea.body}</p>
                   )}
@@ -465,7 +465,7 @@ export const Dashboard: React.FC = () => {
         </GlassCard>
 
         {/* Time per project donut */}
-        <GlassCard className="!p-6 space-y-3">
+        <GlassCard className="!p-5 sm:!p-6 space-y-3">
           <h3 className="text-sm font-medium text-graphite">Time by project</h3>
           {activeProjects.length === 0 ? (
             <div className="flex-1 flex items-center justify-center py-8 text-secondary text-sm">No data</div>
@@ -557,11 +557,19 @@ export const Dashboard: React.FC = () => {
               ))}
             </div>
           </div>
-          <div className="pt-4 flex justify-end gap-2 border-t border-black/[0.06]">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="h-10 px-4 rounded-full text-sm text-secondary hover:text-graphite border border-black/[0.07] bg-white/40">
+          <div className="pt-4 flex items-center justify-end gap-2.5 border-t border-black/[0.06]">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 sm:flex-initial h-10 px-4 rounded-full text-sm text-secondary hover:text-graphite border border-black/[0.07] bg-white/40 active:scale-95 transition-all"
+            >
               Cancel
             </button>
-            <button type="submit" className="h-10 px-5 rounded-full text-sm font-medium bg-lime text-nearblack hover:bg-[var(--accent-lime-hover)] disabled:opacity-60" disabled={createTask.isPending}>
+            <button
+              type="submit"
+              className="flex-1 sm:flex-initial h-10 px-5 rounded-full text-sm font-medium bg-lime text-nearblack hover:bg-[var(--accent-lime-hover)] active:scale-95 transition-all disabled:opacity-60"
+              disabled={createTask.isPending}
+            >
               Add task
             </button>
           </div>
