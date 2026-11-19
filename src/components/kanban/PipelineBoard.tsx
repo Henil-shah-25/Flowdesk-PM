@@ -38,7 +38,6 @@ import {
   AlertTriangle,
   Check,
   Sparkles,
-  User,
   Settings2,
   Archive,
 } from 'lucide-react';
@@ -489,7 +488,7 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
   projectId,
   projectName,
   departmentId,
-  department,
+  department: _department,
   stages,
   tasks,
   isReadOnly = false,
@@ -553,12 +552,6 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
   // Stage rename state
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [editingStageName, setEditingStageName] = useState('');
-
-  // Add stage inline state
-  const [isAddingStage, setIsAddingStage] = useState(false);
-  const [newStageName, setNewStageName] = useState('');
-  const [newStageKind, setNewStageKind] = useState<StageKind>('normal');
-  const [newStageColor, setNewStageColor] = useState<StageColor>('sky');
 
   // Stage Menu & Delete Dialog State
   const [activeMenuStageId, setActiveMenuStageId] = useState<string | null>(null);
@@ -819,38 +812,6 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
       onUpdateStage(stageId, { name: editingStageName.trim() });
     }
     setEditingStageId(null);
-  };
-
-  // Add new stage submit handler
-  const handleAddStageSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStageName.trim()) return;
-
-    const nextOrder = sortedStages.length > 0 ? sortedStages[sortedStages.length - 1].order + 1 : 1;
-
-    onCreateStage({
-      name: newStageName.trim(),
-      kind: newStageKind,
-      color: newStageColor,
-      order: nextOrder,
-    });
-
-    setNewStageName('');
-    setNewStageKind('normal');
-    setNewStageColor('sky');
-    setIsAddingStage(false);
-  };
-
-  // Stage color change
-  const handleChangeStageColor = (stage: Stage, colorName: StageColor) => {
-    onUpdateStage(stage.id, { color: colorName });
-    setActiveMenuStageId(null);
-  };
-
-  // Stage type change
-  const handleChangeStageType = (stage: Stage, newKind: StageKind) => {
-    onUpdateStage(stage.id, { kind: newKind });
-    setActiveMenuStageId(null);
   };
 
   // Stage move left / right
@@ -1484,7 +1445,7 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
             {sortedStages.map((stage) => {
               const columnTasks = filteredTasks.filter((t) => t.stage_id === stage.id);
               const colorDef = getStageColorConfig(stage.color, stage.kind);
-              const stats = stageStats[stage.id] || { count: 0, totalMinutes: 0 };
+              const stats = stageStats[stage.id] || { count: 0, totalMinutes: 0, isOverWip: false };
               const isHoveredColumn = overStageId === stage.id && Boolean(activeDragTask);
 
               return (

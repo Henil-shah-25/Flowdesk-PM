@@ -60,7 +60,7 @@ export const api = {
           const localItems = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
           const localMap = new Map(localItems.map((item) => [String(item.id || item.key), item]));
           const mergedData = remoteData.map((remoteItem) => {
-            const rObj = remoteItem as Record<string, unknown>;
+            const rObj = remoteItem as unknown as Record<string, unknown>;
             const lObj = localMap.get(String(rObj.id || rObj.key));
             if (lObj) {
               return { ...lObj, ...rObj };
