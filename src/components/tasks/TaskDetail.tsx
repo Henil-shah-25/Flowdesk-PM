@@ -16,8 +16,10 @@ import {
   MessageSquare,
   ListTodo,
   User,
+  ArrowLeft,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTaskDetail } from '../../hooks/useTaskDetail';
 import {
   useTableData,
@@ -27,6 +29,8 @@ import {
 } from '../../hooks/useData';
 import { useToast } from '../common/Toast';
 import type { TaskItem, Subtask } from '../../types';
+import { LinkedDevelopmentSection } from './LinkedDevelopmentSection';
+import { ConnectSubProjectModal } from './ConnectSubProjectModal';
 
 interface TaskDetailProps {
   taskId?: string | null;
@@ -38,11 +42,21 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
   onClose: propOnClose,
 }) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { taskId: urlTaskId, closeTask: urlCloseTask } = useTaskDetail();
   const { showToast } = useToast();
 
-  const activeTaskId = propTaskId || urlTaskId;
-  const handleClose = propOnClose || urlCloseTask;
+  const [overrideTaskId, setOverrideTaskId] = useState<string | null>(null);
+  const [parentMainTaskId, setParentMainTaskId] = useState<string | null>(null);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+
+  const activeTaskId = overrideTaskId || propTaskId || urlTaskId;
+  const handleClose = () => {
+    setOverrideTaskId(null);
+    setParentMainTaskId(null);
+    if (propOnClose) propOnClose();
+    if (urlCloseTask) urlCloseTask();
+  };
 
   const { data: tasks = [] } = useTableData('Tasks');
   const { data: projects = [] } = useTableData('Projects');
@@ -265,6 +279,56 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
     });
   };
 
+  // Connected Sub-Project development handlers
+  const handleConnectSubProject = (linkedProjectId: string, linkedTaskId?: string) => {
+    if (!task) return;
+    updateTask.mutate({
+      id: task.id,
+      patch: {
+        linked_project_id: linkedProjectId,
+        linked_task_id: linkedTaskId || '',
+      },
+    });
+    showToast({ message: 'Connected to sub-project development pipeline.' });
+  };
+
+  const handleDisconnectSubProject = () => {
+    if (!task) return;
+    updateTask.mutate({
+      id: task.id,
+      patch: {
+        linked_project_id: '',
+        linked_task_id: '',
+      },
+    });
+    showToast({ message: 'Disconnected linked sub-project.' });
+  };
+
+  const handleRefreshProgress = () => {
+    queryClient.invalidateQueries({ queryKey: ['Tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['Projects'] });
+    queryClient.invalidateQueries({ queryKey: ['Stages'] });
+    showToast({ message: 'Refreshed development progress.' });
+  };
+
+  const handleSelectPhase = (phaseTaskId: string) => {
+    setParentMainTaskId(task?.id || null);
+    setOverrideTaskId(phaseTaskId);
+  };
+
+  const handleMarkMainTaskDone = () => {
+    if (!task) return;
+    const doneStage = stages.find((s) => s.kind === 'done');
+    updateTask.mutate({
+      id: task.id,
+      patch: {
+        done_at: new Date().toISOString(),
+        stage_id: doneStage ? doneStage.id : task.stage_id,
+      },
+    });
+    showToast({ message: `Marked "${task.title}" as completed.` });
+  };
+
   if (!activeTaskId || !task) return null;
 
   const isDone = Boolean(task.done_at);
@@ -297,9 +361,23 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
             <div className="w-10 h-1 rounded-full bg-black/20" />
           </div>
 
-          {/* Top Bar: Project chip + Priority chip + Saved indicator + Close button */}
+          {/* Top Bar: Back button OR Project chip + Priority chip + Saved indicator + Close button */}
           <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3">
             <div className="flex items-center gap-2 flex-wrap">
+              {parentMainTaskId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOverrideTaskId(null);
+                    setParentMainTaskId(null);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-nearblack text-white text-xs font-medium hover:bg-charcoal transition-all shadow-sm mr-1"
+                >
+                  <ArrowLeft size={13} />
+                  <span>Back to Main Task</span>
+                </button>
+              )}
+
               {project && (
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/60 border border-black/[0.06] text-xs font-normal">
                   <span
@@ -520,6 +598,20 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
               </div>
             </div>
 
+            {/* Linked Development Section (Connected Sub-Project Pipeline) */}
+            <LinkedDevelopmentSection
+              task={task}
+              allProjects={projects}
+              allTasks={tasks}
+              allStages={allStages}
+              allNotes={allNotes}
+              onOpenConnectModal={() => setIsConnectModalOpen(true)}
+              onDisconnect={handleDisconnectSubProject}
+              onRefresh={handleRefreshProgress}
+              onSelectPhase={handleSelectPhase}
+              onMarkMainTaskDone={handleMarkMainTaskDone}
+            />
+
             {/* Subtasks Section */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
@@ -716,6 +808,19 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
           </div>
         </motion.div>
       </div>
+
+      {/* Connect Sub-Project Modal */}
+      {isConnectModalOpen && task && (
+        <ConnectSubProjectModal
+          isOpen={isConnectModalOpen}
+          onClose={() => setIsConnectModalOpen(false)}
+          currentTask={task}
+          projects={projects}
+          tasks={tasks}
+          stages={allStages}
+          onConnect={handleConnectSubProject}
+        />
+      )}
     </AnimatePresence>
   );
 };

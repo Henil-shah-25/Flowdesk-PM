@@ -103,6 +103,9 @@ export interface TaskItem {
   assignee_name?: string;
   checklist?: ChecklistItem[] | string;
   created_at: string;
+  // Connected Main Project & Sub-Project Linkage
+  linked_project_id?: string;
+  linked_task_id?: string;
 }
 
 export interface Idea {

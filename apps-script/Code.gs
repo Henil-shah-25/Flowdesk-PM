@@ -15,7 +15,7 @@ const SCHEMAS = {
   Projects: ['id', 'parent_id', 'name', 'type', 'color', 'status', 'due_date', 'archived', 'created_at'],
   Departments: ['id', 'project_id', 'parent_id', 'name', 'color', 'enabled', 'order'],
   Stages: ['id', 'department_id', 'project_id', 'name', 'kind', 'color', 'order', 'description', 'wip_limit', 'is_archived', 'created_at', 'updated_at'],
-  Tasks: ['id', 'project_id', 'department_id', 'stage_id', 'title', 'description', 'priority', 'estimate_min', 'actual_min', 'due_date', 'order', 'done_at', 'recurring', 'source', 'template_id', 'assignee_id', 'created_at'],
+  Tasks: ['id', 'project_id', 'department_id', 'stage_id', 'title', 'description', 'priority', 'estimate_min', 'actual_min', 'due_date', 'order', 'done_at', 'recurring', 'source', 'template_id', 'assignee_id', 'created_at', 'linked_project_id', 'linked_task_id'],
   Ideas: ['id', 'title', 'body', 'color', 'x', 'y', 'w', 'h', 'rotation', 'z', 'status', 'project_id', 'department_id', 'stage_id', 'created_at'],
   TimeLogs: ['id', 'task_id', 'project_id', 'mode', 'start', 'end', 'duration_min'],
   Templates: ['id', 'department_name', 'sub_name', 'group_name', 'task_title', 'description', 'priority', 'estimate_min', 'order', 'subtasks'],
@@ -194,7 +194,16 @@ function getSheetHeaders(sheet, tab) {
   }
   const rowHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || '').trim());
   const validHeaders = rowHeaders.filter(Boolean);
-  return validHeaders.length > 0 ? rowHeaders : (SCHEMAS[tab] || []);
+  const expected = SCHEMAS[tab] || [];
+  const existingSet = new Set(validHeaders.map(h => h.toLowerCase()));
+  const missing = expected.filter(h => !existingSet.has(h.toLowerCase()));
+  if (missing.length > 0) {
+    const startCol = validHeaders.length + 1;
+    sheet.getRange(1, startCol, 1, missing.length).setValues([missing]);
+    sheet.getRange(1, startCol, 1, missing.length).setFontWeight('bold');
+    return [...validHeaders, ...missing];
+  }
+  return validHeaders.length > 0 ? validHeaders : expected;
 }
 
 function getRowsAsObjects(sheet, tab) {

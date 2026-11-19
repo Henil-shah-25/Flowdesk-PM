@@ -201,7 +201,9 @@ export const initialMockTasks: TaskItem[] = [
       { id: 'c1', text: 'Column headers with count and indicator', completed: true },
       { id: 'c2', text: 'Inline rename on stage title', completed: true },
       { id: 'c3', text: 'Checklist subtasks in detail drawer', completed: false },
-    ]
+    ],
+    linked_project_id: 'subproj_1',
+    linked_task_id: 'task_5'
   },
   {
     id: 'task_2',
