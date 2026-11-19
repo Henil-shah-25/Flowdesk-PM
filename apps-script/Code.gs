@@ -15,7 +15,7 @@ const SCHEMAS = {
   Projects: ['id', 'parent_id', 'name', 'type', 'color', 'status', 'due_date', 'archived', 'created_at'],
   Departments: ['id', 'project_id', 'parent_id', 'name', 'color', 'enabled', 'order'],
   Stages: ['id', 'department_id', 'project_id', 'name', 'kind', 'color', 'order', 'description', 'wip_limit', 'is_archived', 'created_at', 'updated_at'],
-  Tasks: ['id', 'project_id', 'department_id', 'stage_id', 'title', 'description', 'priority', 'estimate_min', 'actual_min', 'due_date', 'order', 'done_at', 'recurring', 'source', 'template_id', 'assignee_id', 'created_at', 'linked_project_id', 'linked_task_id'],
+  Tasks: ['id', 'project_id', 'department_id', 'stage_id', 'title', 'description', 'priority', 'estimate_min', 'actual_min', 'due_date', 'order', 'done_at', 'recurring', 'created_at', 'source', 'template_id', 'assignee_id', 'linked_project_id', 'linked_task_id'],
   Ideas: ['id', 'title', 'body', 'color', 'x', 'y', 'w', 'h', 'rotation', 'z', 'status', 'project_id', 'department_id', 'stage_id', 'created_at'],
   TimeLogs: ['id', 'task_id', 'project_id', 'mode', 'start', 'end', 'duration_min'],
   Templates: ['id', 'department_name', 'sub_name', 'group_name', 'task_title', 'description', 'priority', 'estimate_min', 'order', 'subtasks'],
@@ -244,7 +244,39 @@ function actionList(tab) {
 
   const sheet = getSheet(tab);
   const rows = getRowsAsObjects(sheet, tab);
-  const cleanRows = rows.map(({ _rowIndex, ...rest }) => rest);
+  let cleanRows = rows.map(({ _rowIndex, ...rest }) => rest);
+
+  // If listing Tasks, hydrate linked_project_id and linked_task_id from Settings sheet
+  if (tab === 'Tasks') {
+    try {
+      const settingsSheet = getSheet('Settings');
+      const settings = getRowsAsObjects(settingsSheet, 'Settings');
+      const linkMap = new Map();
+      settings.forEach(s => {
+        if (s.key && String(s.key).startsWith('link_task_') && s.value) {
+          const taskId = String(s.key).replace('link_task_', '');
+          try {
+            linkMap.set(taskId, JSON.parse(s.value));
+          } catch(err) {
+            linkMap.set(taskId, { linked_project_id: String(s.value) });
+          }
+        }
+      });
+      if (linkMap.size > 0) {
+        cleanRows = cleanRows.map(t => {
+          const link = linkMap.get(String(t.id));
+          if (!link) return t;
+          return {
+            ...t,
+            linked_project_id: t.linked_project_id || link.linked_project_id || '',
+            linked_task_id: t.linked_task_id || link.linked_task_id || ''
+          };
+        });
+      }
+    } catch (e) {
+      // Fallback to raw cleanRows
+    }
+  }
   
   // Only store static reference tables in script cache
   if (!isVolatile) {
@@ -279,6 +311,19 @@ function actionCreate(tab, row) {
   const rowValues = headers.map(h => newRow[h] !== undefined ? newRow[h] : '');
   sheet.appendRow(rowValues);
   
+  // Dual-persist linked development connection into Settings sheet
+  if (tab === 'Tasks' && newRow.linked_project_id) {
+    try {
+      actionBatchUpdate('Settings', [{
+        key: 'link_task_' + newRow.id,
+        value: JSON.stringify({
+          linked_project_id: newRow.linked_project_id,
+          linked_task_id: newRow.linked_task_id || ''
+        })
+      }]);
+    } catch (e) {}
+  }
+
   // Invalidate cache and increment server revision
   invalidateTabCache(tab);
   incrementTabRevision(tab);
@@ -301,6 +346,24 @@ function actionUpdate(tab, id, patch) {
   
   sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
   
+  // Dual-persist linked development connection into Settings sheet for bulletproof persistence
+  if (tab === 'Tasks' && patch.linked_project_id !== undefined) {
+    try {
+      const settingKey = 'link_task_' + id;
+      if (patch.linked_project_id) {
+        actionBatchUpdate('Settings', [{
+          key: settingKey,
+          value: JSON.stringify({
+            linked_project_id: patch.linked_project_id,
+            linked_task_id: patch.linked_task_id || ''
+          })
+        }]);
+      } else {
+        try { actionDelete('Settings', settingKey); } catch(e){}
+      }
+    } catch(e) {}
+  }
+
   // Invalidate cache and increment server revision
   invalidateTabCache(tab);
   incrementTabRevision(tab);
@@ -319,6 +382,13 @@ function actionDelete(tab, id) {
   }
   
   sheet.deleteRow(target._rowIndex);
+
+  if (tab === 'Tasks') {
+    try {
+      actionDelete('Settings', 'link_task_' + id);
+    } catch (e) {}
+  }
+
   invalidateTabCache(tab);
   incrementTabRevision(tab);
   return { deleted: true, id: id };

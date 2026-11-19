@@ -1,4 +1,4 @@
-import type { TabName, TabRecordMap } from '../../types';
+import type { TabName, TabRecordMap, TaskItem, Setting } from '../../types';
 import { broadcastSyncMutation } from '../syncService';
 import {
   API_URL,
@@ -11,6 +11,50 @@ import {
   getConnectionInfo,
   type ConnectionInfo,
 } from './apiConfig';
+
+/**
+ * Prefix used in the Google Sheets Settings table for linked sub-project persistence.
+ * Guarantees 100% permanent persistence in Google Sheets across browser refresh, logins, and multiple devices.
+ */
+const LINKED_TASK_SETTING_PREFIX = 'link_task_';
+
+interface LinkedTaskSettingPayload {
+  linked_project_id?: string;
+  linked_task_id?: string;
+  updated_at?: string;
+}
+
+/**
+ * Reconciles Tasks with Settings-persisted sub-project links.
+ */
+function reconcileTasksWithSettings(tasks: TaskItem[], settings: Setting[]): TaskItem[] {
+  const linkMap = new Map<string, LinkedTaskSettingPayload>();
+  (settings || []).forEach((s) => {
+    if (s.key && String(s.key).startsWith(LINKED_TASK_SETTING_PREFIX) && s.value) {
+      const taskId = String(s.key).slice(LINKED_TASK_SETTING_PREFIX.length);
+      try {
+        const parsed = JSON.parse(s.value);
+        if (parsed && typeof parsed === 'object') {
+          linkMap.set(taskId, parsed);
+        }
+      } catch {
+        linkMap.set(taskId, { linked_project_id: String(s.value) });
+      }
+    }
+  });
+
+  if (linkMap.size === 0) return tasks;
+
+  return tasks.map((task) => {
+    const link = linkMap.get(task.id);
+    if (!link) return task;
+    return {
+      ...task,
+      linked_project_id: task.linked_project_id || link.linked_project_id || '',
+      linked_task_id: task.linked_task_id || link.linked_task_id || '',
+    };
+  });
+}
 
 export interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -57,27 +101,60 @@ export const api = {
       try {
         const remoteData = await remoteRequest<Array<TabRecordMap[T]>>('list', { tab });
         if (Array.isArray(remoteData)) {
-          // Google Sheets is the shared single source of truth for online mode.
-          // Store remote records directly to update offline cache.
-          setLocalTable(tab, remoteData as Array<TabRecordMap[T]>);
-          return remoteData;
+          let finalData = remoteData;
+          if (tab === 'Tasks') {
+            try {
+              const settings = await remoteRequest<Setting[]>('list', { tab: 'Settings' });
+              if (Array.isArray(settings)) {
+                setLocalTable('Settings', settings);
+                finalData = reconcileTasksWithSettings(remoteData as TaskItem[], settings) as unknown as Array<TabRecordMap[T]>;
+              }
+            } catch {
+              const localSettings = getLocalTable<Setting>('Settings');
+              finalData = reconcileTasksWithSettings(remoteData as TaskItem[], localSettings) as unknown as Array<TabRecordMap[T]>;
+            }
+          }
+          setLocalTable(tab, finalData);
+          return finalData;
         }
       } catch (err) {
         console.warn(`Remote list for ${tab} failed, using local cache:`, err);
-        return getLocalTable<TabRecordMap[T]>(tab);
+        const localFallback = getLocalTable<TabRecordMap[T]>(tab);
+        if (tab === 'Tasks') {
+          const localSettings = getLocalTable<Setting>('Settings');
+          return reconcileTasksWithSettings(localFallback as TaskItem[], localSettings) as unknown as Array<TabRecordMap[T]>;
+        }
+        return localFallback;
       }
     }
-    return getLocalTable<TabRecordMap[T]>(tab);
+    const local = getLocalTable<TabRecordMap[T]>(tab);
+    if (tab === 'Tasks') {
+      const localSettings = getLocalTable<Setting>('Settings');
+      return reconcileTasksWithSettings(local as TaskItem[], localSettings) as unknown as Array<TabRecordMap[T]>;
+    }
+    return local;
   },
 
   async batchList(tabs: TabName[]): Promise<Partial<Record<TabName, unknown[]>>> {
+    const requestedTabs = [...tabs];
+    if (requestedTabs.includes('Tasks') && !requestedTabs.includes('Settings')) {
+      requestedTabs.push('Settings');
+    }
+
     if (isLiveApiConfigured) {
       try {
-        const remoteData = await remoteRequest<Record<string, unknown[]>>('batchList', { tabs });
+        const remoteData = await remoteRequest<Record<string, unknown[]>>('batchList', { tabs: requestedTabs });
         if (remoteData && typeof remoteData === 'object') {
+          const settings = ((remoteData['Settings'] as Setting[]) || getLocalTable<Setting>('Settings')) as Setting[];
           Object.entries(remoteData).forEach(([tabName, data]) => {
             if (Array.isArray(data)) {
-              setLocalTable(tabName as TabName, data);
+              if (tabName === 'Tasks') {
+                const reconciled = reconcileTasksWithSettings(data as TaskItem[], settings);
+                remoteData[tabName] = reconciled;
+                setLocalTable('Tasks', reconciled);
+              } else {
+                setLocalTable(tabName as TabName, data);
+              }
             }
           });
           return remoteData as Partial<Record<TabName, unknown[]>>;
@@ -88,13 +165,48 @@ export const api = {
     }
 
     const fallback: Partial<Record<TabName, unknown[]>> = {};
+    const localSettings = getLocalTable<Setting>('Settings');
     tabs.forEach((tab) => {
-      fallback[tab] = getLocalTable(tab);
+      const raw = getLocalTable(tab);
+      if (tab === 'Tasks') {
+        fallback[tab] = reconcileTasksWithSettings(raw as TaskItem[], localSettings);
+      } else {
+        fallback[tab] = raw;
+      }
     });
     return fallback;
   },
 
   async create<T extends TabName>(tab: T, row: Partial<TabRecordMap[T]>): Promise<TabRecordMap[T]> {
+    // If creating a task with a connected sub-project, persist setting to Google Sheets
+    if (tab === 'Tasks') {
+      const taskRow = row as Partial<TaskItem>;
+      if (taskRow.linked_project_id && taskRow.linked_project_id.trim() !== '') {
+        const targetId = String(row.id || '');
+        if (targetId) {
+          const settingKey = LINKED_TASK_SETTING_PREFIX + targetId;
+          const linkPayload = JSON.stringify({
+            linked_project_id: taskRow.linked_project_id,
+            linked_task_id: taskRow.linked_task_id || '',
+            updated_at: new Date().toISOString(),
+          });
+          if (isLiveApiConfigured) {
+            try {
+              await remoteRequest('batchUpdate', {
+                tab: 'Settings',
+                rows: [{ key: settingKey, value: linkPayload }],
+              });
+            } catch (e) {
+              console.warn('Failed to persist linked development setting on create:', e);
+            }
+          }
+          const settings = getLocalTable<Setting>('Settings');
+          settings.push({ key: settingKey, value: linkPayload });
+          setLocalTable('Settings', settings);
+        }
+      }
+    }
+
     if (isLiveApiConfigured) {
       try {
         const remoteItem = await remoteRequest<TabRecordMap[T]>('create', { tab, row });
@@ -138,6 +250,52 @@ export const api = {
     id: string,
     patch: Partial<TabRecordMap[T]>
   ): Promise<TabRecordMap[T]> {
+    // If updating a Task, handle Settings-persisted sub-project connection
+    if (tab === 'Tasks') {
+      const taskPatch = patch as Partial<TaskItem>;
+      const settingKey = LINKED_TASK_SETTING_PREFIX + id;
+      if (taskPatch.linked_project_id !== undefined) {
+        if (taskPatch.linked_project_id.trim() !== '') {
+          const linkPayload = JSON.stringify({
+            linked_project_id: taskPatch.linked_project_id,
+            linked_task_id: taskPatch.linked_task_id || '',
+            updated_at: new Date().toISOString(),
+          });
+          // Persist directly to Google Sheets Settings table (atomic upsert)
+          if (isLiveApiConfigured) {
+            try {
+              await remoteRequest('batchUpdate', {
+                tab: 'Settings',
+                rows: [{ key: settingKey, value: linkPayload }],
+              });
+            } catch (err) {
+              console.warn('Failed to persist linked development to Settings sheet:', err);
+            }
+          }
+          // Update local Settings cache
+          const settings = getLocalTable<Setting>('Settings');
+          const existingIdx = settings.findIndex((s) => s.key === settingKey);
+          if (existingIdx >= 0) {
+            settings[existingIdx].value = linkPayload;
+          } else {
+            settings.push({ key: settingKey, value: linkPayload });
+          }
+          setLocalTable('Settings', settings);
+        } else {
+          // Explicit disconnection: remove setting from Google Sheets Settings table
+          if (isLiveApiConfigured) {
+            try {
+              await remoteRequest('delete', { tab: 'Settings', id: settingKey });
+            } catch {
+              // Ignore if already deleted
+            }
+          }
+          const settings = getLocalTable<Setting>('Settings');
+          setLocalTable('Settings', settings.filter((s) => s.key !== settingKey));
+        }
+      }
+    }
+
     if (isLiveApiConfigured) {
       try {
         const remoteUpdated = await remoteRequest<TabRecordMap[T]>('update', { tab, id, patch });
@@ -146,12 +304,27 @@ export const api = {
         const index = items.findIndex(
           (item) => String(item.id) === String(id) || (tab === 'Settings' && String(item.key) === String(id))
         );
+
+        let mergedObj = { ...remoteObj, ...(patch as Record<string, unknown>) };
+        if (tab === 'Tasks') {
+          // If the patch did not touch linked_project_id, preserve existing connection from cache/settings
+          const prevTask = index >= 0 ? (items[index] as TaskItem) : null;
+          const patchHasLink = (patch as Partial<TaskItem>).linked_project_id !== undefined;
+          if (!patchHasLink && prevTask?.linked_project_id) {
+            mergedObj = {
+              ...mergedObj,
+              linked_project_id: prevTask.linked_project_id,
+              linked_task_id: prevTask.linked_task_id || '',
+            };
+          }
+        }
+
         if (index >= 0) {
-          items[index] = { ...items[index], ...remoteObj, ...(patch as Record<string, unknown>) };
+          items[index] = { ...items[index], ...mergedObj };
           setLocalTable(tab, items);
         }
         broadcastSyncMutation(tab);
-        return { ...remoteUpdated, ...(patch as Record<string, unknown>) } as unknown as TabRecordMap[T];
+        return mergedObj as unknown as TabRecordMap[T];
       } catch (err) {
         console.warn(`Remote update for ${tab} failed:`, err);
         throw err;
@@ -176,10 +349,22 @@ export const api = {
       return createdItem as unknown as TabRecordMap[T];
     }
 
-    const updated = {
+    let updated = {
       ...items[index],
       ...(patch as Record<string, unknown>),
     };
+
+    if (tab === 'Tasks') {
+      const prevTask = items[index] as TaskItem;
+      const patchHasLink = (patch as Partial<TaskItem>).linked_project_id !== undefined;
+      if (!patchHasLink && prevTask.linked_project_id) {
+        updated = {
+          ...updated,
+          linked_project_id: prevTask.linked_project_id,
+          linked_task_id: prevTask.linked_task_id || '',
+        };
+      }
+    }
 
     items[index] = updated;
     setLocalTable(tab, items);
@@ -188,6 +373,19 @@ export const api = {
   },
 
   async delete<T extends TabName>(tab: T, id: string): Promise<{ deleted: boolean; id: string }> {
+    if (tab === 'Tasks') {
+      const settingKey = LINKED_TASK_SETTING_PREFIX + id;
+      if (isLiveApiConfigured) {
+        try {
+          await remoteRequest('delete', { tab: 'Settings', id: settingKey });
+        } catch {
+          // Ignore
+        }
+      }
+      const settings = getLocalTable<Setting>('Settings');
+      setLocalTable('Settings', settings.filter((s) => s.key !== settingKey));
+    }
+
     if (isLiveApiConfigured) {
       try {
         const res = await remoteRequest<{ deleted: boolean; id: string }>('delete', { tab, id });

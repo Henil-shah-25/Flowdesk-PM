@@ -308,6 +308,7 @@ export const TaskDetail: React.FC<TaskDetailProps> = ({
     queryClient.invalidateQueries({ queryKey: ['Tasks'] });
     queryClient.invalidateQueries({ queryKey: ['Projects'] });
     queryClient.invalidateQueries({ queryKey: ['Stages'] });
+    queryClient.invalidateQueries({ queryKey: ['Settings'] });
     showToast({ message: 'Refreshed development progress.' });
   };
 

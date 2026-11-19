@@ -70,6 +70,9 @@ function invalidateTabAndRelated<T extends TabName>(qc: ReturnType<typeof useQue
   if (tab === 'Tasks') {
     qc.invalidateQueries({ queryKey: ['Projects'] });
     qc.invalidateQueries({ queryKey: ['Stages'] });
+    qc.invalidateQueries({ queryKey: ['Settings'] });
+  } else if (tab === 'Settings') {
+    qc.invalidateQueries({ queryKey: ['Tasks'] });
   } else if (tab === 'Stages') {
     qc.invalidateQueries({ queryKey: ['Tasks'] });
   } else if (tab === 'Projects') {
