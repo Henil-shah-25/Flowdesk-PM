@@ -9,6 +9,18 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icons/*.png'],
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api/, /script\.google\.com/],
+        runtimeCaching: [
+          {
+            // CRITICAL: Ensure all Google Apps Script API calls are NetworkOnly and never cached by Service Worker
+            urlPattern: /^https:\/\/script\.google\.com\/.*/i,
+            handler: 'NetworkOnly',
+          },
+        ],
+      },
       manifest: {
         name: 'Flowdesk',
         short_name: 'Flowdesk',

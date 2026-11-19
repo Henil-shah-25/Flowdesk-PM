@@ -32,16 +32,50 @@ export function useSyncStatus(): SyncStatus {
   return 'synced';
 }
 
+const VOLATILE_TABLES: readonly string[] = [
+  'Tasks',
+  'Projects',
+  'Stages',
+  'Subtasks',
+  'Notes',
+  'TimeLogs',
+  'Ideas',
+  'Leave',
+];
+
 /**
- * Generic query hook to fetch items from any table
+ * Generic query hook to fetch items from any table.
+ * Includes short 15-second polling for volatile tables (Tasks, Projects, Stages)
+ * with instant pause in background and immediate revalidation on focus.
  */
 export function useTableData<T extends TabName>(tab: T) {
+  const isVolatile = VOLATILE_TABLES.includes(tab);
+
   return useQuery({
     queryKey: [tab],
     queryFn: () => api.list(tab),
-    staleTime: 1000 * 60 * 2, // 2 minutes: eliminates redundant network calls during page navigation
+    // 10s for volatile tables, 60s for static reference tables (Departments, Teams, Templates)
+    staleTime: isVolatile ? 1000 * 10 : 1000 * 60,
     gcTime: 1000 * 60 * 60 * 24,
+    // Active background polling fallback: 15 seconds for volatile real-time data
+    refetchInterval: isVolatile ? 15000 : 60000,
+    refetchIntervalInBackground: false, // Automatically stops polling when tab/app is hidden or minimized
+    refetchOnWindowFocus: true, // Immediate revalidation on tab/window focus
+    refetchOnReconnect: true,
   });
+}
+
+function invalidateTabAndRelated<T extends TabName>(qc: ReturnType<typeof useQueryClient>, tab: T) {
+  qc.invalidateQueries({ queryKey: [tab] });
+  if (tab === 'Tasks') {
+    qc.invalidateQueries({ queryKey: ['Projects'] });
+    qc.invalidateQueries({ queryKey: ['Stages'] });
+  } else if (tab === 'Stages') {
+    qc.invalidateQueries({ queryKey: ['Tasks'] });
+  } else if (tab === 'Projects') {
+    qc.invalidateQueries({ queryKey: ['Departments'] });
+    qc.invalidateQueries({ queryKey: ['Tasks'] });
+  }
 }
 
 /**
@@ -73,7 +107,7 @@ export function useCreateRecord<T extends TabName>(tab: T) {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: [tab] });
+      invalidateTabAndRelated(qc, tab);
     },
   });
 }
@@ -110,7 +144,7 @@ export function useUpdateRecord<T extends TabName>(tab: T) {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: [tab] });
+      invalidateTabAndRelated(qc, tab);
     },
   });
 }
@@ -143,7 +177,7 @@ export function useDeleteRecord<T extends TabName>(tab: T) {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: [tab] });
+      invalidateTabAndRelated(qc, tab);
     },
   });
 }
@@ -197,7 +231,7 @@ export function useBatchUpdateRecord<T extends TabName>(tab: T) {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: [tab] });
+      invalidateTabAndRelated(qc, tab);
     },
   });
 }
@@ -231,7 +265,7 @@ export function useBatchDeleteRecord<T extends TabName>(tab: T) {
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: [tab] });
+      invalidateTabAndRelated(qc, tab);
     },
   });
 }

@@ -6,7 +6,10 @@
 
 const TOKEN_PROPERTY_KEY = 'FLOWDESK_API_TOKEN';
 const CACHE_PREFIX = 'FLOWDESK_CACHE_TAB_';
-const CACHE_TTL_SECONDS = 600; // 10 minutes TTL
+const CACHE_TTL_SECONDS = 30; // Max 30 seconds for static reference data
+
+// Volatile tables that change constantly across devices and must NEVER be served from a stale multi-minute cache
+const VOLATILE_TABS = ['Tasks', 'Projects', 'Stages', 'Subtasks', 'Notes', 'TimeLogs', 'Ideas', 'Leave', 'Messages'];
 
 const SCHEMAS = {
   Projects: ['id', 'parent_id', 'name', 'type', 'color', 'status', 'due_date', 'archived', 'created_at'],
@@ -150,6 +153,28 @@ function invalidateTabCache(tab) {
   }
 }
 
+function incrementTabRevision(tab) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const current = Number(props.getProperty('REV_' + tab) || 0);
+    props.setProperty('REV_' + tab, String(current + 1));
+    props.setProperty('LAST_MODIFIED_' + tab, new Date().toISOString());
+  } catch (e) {
+    // Ignore property failure
+  }
+}
+
+function actionSyncCheck() {
+  const props = PropertiesService.getScriptProperties();
+  const revisions = {};
+  const lastModified = {};
+  Object.keys(SCHEMAS).forEach(tab => {
+    revisions[tab] = Number(props.getProperty('REV_' + tab) || 0);
+    lastModified[tab] = props.getProperty('LAST_MODIFIED_' + tab) || '';
+  });
+  return { revisions, lastModified, serverTime: new Date().toISOString() };
+}
+
 function getSheet(tab) {
   if (!SCHEMAS[tab]) {
     throw new Error('Invalid tab name: ' + tab);
@@ -198,18 +223,24 @@ function getRowsAsObjects(sheet, tab) {
 }
 
 function actionList(tab) {
-  // Check memory cache first
-  const cached = getCachedTab(tab);
-  if (cached && Array.isArray(cached)) {
-    return cached;
+  const isVolatile = VOLATILE_TABS.includes(tab);
+
+  // Volatile tables (Tasks, Projects, Stages, etc.) must NEVER be served from a stale script cache
+  if (!isVolatile) {
+    const cached = getCachedTab(tab);
+    if (cached && Array.isArray(cached)) {
+      return cached;
+    }
   }
 
   const sheet = getSheet(tab);
   const rows = getRowsAsObjects(sheet, tab);
   const cleanRows = rows.map(({ _rowIndex, ...rest }) => rest);
   
-  // Store into script cache
-  setCachedTab(tab, cleanRows);
+  // Only store static reference tables in script cache
+  if (!isVolatile) {
+    setCachedTab(tab, cleanRows);
+  }
   return cleanRows;
 }
 
@@ -239,8 +270,9 @@ function actionCreate(tab, row) {
   const rowValues = headers.map(h => newRow[h] !== undefined ? newRow[h] : '');
   sheet.appendRow(rowValues);
   
-  // Invalidate cache for this tab
+  // Invalidate cache and increment server revision
   invalidateTabCache(tab);
+  incrementTabRevision(tab);
   return newRow;
 }
 
@@ -260,8 +292,9 @@ function actionUpdate(tab, id, patch) {
   
   sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowValues]);
   
-  // Invalidate cache for this tab
+  // Invalidate cache and increment server revision
   invalidateTabCache(tab);
+  incrementTabRevision(tab);
   
   const { _rowIndex, ...cleanUpdated } = updated;
   return cleanUpdated;
@@ -278,6 +311,7 @@ function actionDelete(tab, id) {
   
   sheet.deleteRow(target._rowIndex);
   invalidateTabCache(tab);
+  incrementTabRevision(tab);
   return { deleted: true, id: id };
 }
 
@@ -323,8 +357,9 @@ function actionBatchUpdate(tab, rows) {
     sheet.getRange(startRow, 1, valuesToAppend.length, headers.length).setValues(valuesToAppend);
   }
   
-  // Invalidate cache for this tab
+  // Invalidate cache and increment server revision
   invalidateTabCache(tab);
+  incrementTabRevision(tab);
   return results;
 }
 
@@ -352,8 +387,9 @@ function actionBatchDelete(tab, ids) {
     sheet.getRange(2, 1, values.length, headers.length).setValues(values);
   }
 
-  // Invalidate cache for this tab
+  // Invalidate cache and increment server revision
   invalidateTabCache(tab);
+  incrementTabRevision(tab);
   return { deleted: deletedCount, ids: ids };
 }
 
@@ -363,6 +399,8 @@ function handleRequest(action, payload) {
   switch (action) {
     case 'ping':
       return { ok: true };
+    case 'syncCheck':
+      return actionSyncCheck();
     case 'list':
       return actionList(tab);
     case 'batchList':

@@ -70,7 +70,10 @@ export function setLocalTable<T>(tab: TabName, data: T[]): void {
   }
 }
 
-// Generate simple client-side ID for local mocks
+// Generate globally unique canonical ID for records (UUIDv4 when available, fallback to timestamp random)
 export function generateLocalId(): string {
-  return 'local_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'id_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 }

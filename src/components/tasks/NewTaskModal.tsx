@@ -172,10 +172,11 @@ export const NewTaskModal: React.FC<NewTaskModalProps> = ({
       showToast({ message: `Created task "${title.trim()}".` });
       if (onSuccess) onSuccess(created);
       onClose();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Task creation error:', err);
-      showToast({ message: 'Task created locally.' });
-      onClose();
+      const msg = (err as Error)?.message || 'Task creation failed. Please check your connection and try again.';
+      showToast({ message: msg });
+      // Keep modal open to preserve unsaved user input
     } finally {
       setIsSubmitting(false);
     }

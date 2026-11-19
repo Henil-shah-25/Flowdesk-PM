@@ -6,9 +6,13 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { TopHeader } from './TopHeader';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { TaskDetail } from '../tasks/TaskDetail';
+import { useSyncCoordinator } from '../../services/syncService';
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
+
+  // Activate cross-device and cross-tab synchronization listener
+  useSyncCoordinator();
 
   return (
     <div className="relative min-h-screen flex flex-col text-graphite antialiased font-sans">

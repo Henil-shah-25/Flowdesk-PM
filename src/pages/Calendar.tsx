@@ -105,11 +105,10 @@ function DraggableTaskChip({
         e.stopPropagation();
         onOpenDrawer(task);
       }}
-      className={`h-[30px] rounded-full px-3 text-[14px] md:text-[15px] shadow-xs border flex items-center gap-2 select-none cursor-grab active:cursor-grabbing transition-colors hover:shadow-sm ${
-        isTodayCell
-          ? 'bg-white/20 text-white border-white/25 hover:bg-white/30'
-          : 'bg-white text-graphite border-black/[0.06] hover:bg-white/95'
-      } ${isCompleted ? 'line-through opacity-50' : ''}`}
+      className={`h-[30px] rounded-full px-3 text-[14px] md:text-[15px] shadow-xs border flex items-center gap-2 select-none cursor-grab active:cursor-grabbing transition-colors hover:shadow-sm ${isTodayCell
+        ? 'bg-white/20 text-white border-white/25 hover:bg-white/30'
+        : 'bg-white text-graphite border-black/[0.06] hover:bg-white/95'
+        } ${isCompleted ? 'line-through opacity-50' : ''}`}
     >
       {/* Department dot */}
       <span
@@ -120,9 +119,8 @@ function DraggableTaskChip({
       <span className="truncate flex-1 font-normal tracking-tight">{task.title}</span>
       {/* Time on the right */}
       <span
-        className={`shrink-0 text-xs font-normal ${
-          isTodayCell ? 'text-white/80' : 'text-secondary'
-        }`}
+        className={`shrink-0 text-xs font-normal ${isTodayCell ? 'text-white/80' : 'text-secondary'
+          }`}
       >
         {dueTimeStr}
       </span>
@@ -212,24 +210,21 @@ function MonthDayCell({
       ref={setNodeRef}
       data-day-cell={dayKey}
       onClick={() => onOpenDaySheet(day)}
-      className={`group relative rounded-[24px] p-2.5 sm:p-3 min-h-[150px] 2xl:min-h-[160px] flex flex-col justify-between transition-all select-none cursor-pointer border ${
-        isDayToday
-          ? 'bg-charcoal text-white border-charcoal shadow-md ring-1 ring-charcoal'
-          : hasTasks
+      className={`group relative rounded-[24px] p-2.5 sm:p-3 min-h-[150px] 2xl:min-h-[160px] flex flex-col justify-between transition-all select-none cursor-pointer border ${isDayToday
+        ? 'bg-charcoal text-white border-charcoal shadow-md ring-1 ring-charcoal'
+        : hasTasks
           ? 'bg-[#8DB3DE]/60 text-graphite border-white/70 hover:bg-[#8DB3DE]/75'
           : 'bg-inner-surface text-graphite border-white/60 hover:bg-white/80'
-      } ${!isCurrentMonth ? 'opacity-35' : ''} ${
-        isOver ? 'ring-2 ring-lime border-dashed border-lime scale-[1.01]' : ''
-      }`}
+        } ${!isCurrentMonth ? 'opacity-35' : ''} ${isOver ? 'ring-2 ring-lime border-dashed border-lime scale-[1.01]' : ''
+        }`}
     >
       {/* Top row: 22px Day Number + Overlapping project badges */}
       <div className="flex items-center justify-between">
         <span
-          className={`text-[20px] md:text-[22px] font-light tracking-tight leading-none ${
-            isDayToday
-              ? 'w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/20 text-white flex items-center justify-center font-normal'
-              : 'text-graphite'
-          }`}
+          className={`text-[20px] md:text-[22px] font-light tracking-tight leading-none ${isDayToday
+            ? 'w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/20 text-white flex items-center justify-center font-normal'
+            : 'text-graphite'
+            }`}
         >
           {format(day, 'd')}
         </span>
@@ -292,11 +287,10 @@ function MonthDayCell({
                 e.stopPropagation();
                 onOpenDaySheet(day);
               }}
-              className={`text-left text-xs font-medium px-2 py-0.5 rounded-md transition-colors ${
-                isDayToday
-                  ? 'text-white/80 hover:text-white hover:bg-white/10'
-                  : 'text-secondary hover:text-graphite hover:bg-black/5'
-              }`}
+              className={`text-left text-xs font-medium px-2 py-0.5 rounded-md transition-colors ${isDayToday
+                ? 'text-white/80 hover:text-white hover:bg-white/10'
+                : 'text-secondary hover:text-graphite hover:bg-black/5'
+                }`}
             >
               +{dayTasks.length - 3} more
             </button>
@@ -595,10 +589,11 @@ export const Calendar: React.FC = () => {
       });
       setNewTaskTitle('');
       setIsNewTaskModalOpen(false);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      showToast({ message: 'Task created locally.' });
-      setIsNewTaskModalOpen(false);
+      const msg = (err as Error)?.message || 'Task creation failed. Please check connection.';
+      showToast({ message: msg });
+      // Keep modal open to preserve user inputs
     }
   };
 
@@ -718,11 +713,10 @@ export const Calendar: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedProjectId(null)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
-                selectedProjectId === null
-                  ? 'bg-nearblack text-white shadow-sm'
-                  : 'bg-white/55 text-secondary hover:text-graphite border border-white/60'
-              }`}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${selectedProjectId === null
+                ? 'bg-nearblack text-white shadow-sm'
+                : 'bg-white/55 text-secondary hover:text-graphite border border-white/60'
+                }`}
             >
               All projects
             </button>
@@ -735,11 +729,10 @@ export const Calendar: React.FC = () => {
                   key={p.id}
                   type="button"
                   onClick={() => setSelectedProjectId(isSelected ? null : p.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-2 ${
-                    isSelected
-                      ? 'bg-nearblack text-white shadow-sm'
-                      : 'bg-white/55 text-secondary hover:text-graphite border border-white/60 hover:bg-white/80'
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-2 ${isSelected
+                    ? 'bg-nearblack text-white shadow-sm'
+                    : 'bg-white/55 text-secondary hover:text-graphite border border-white/60 hover:bg-white/80'
+                    }`}
                 >
                   <span
                     className="w-2 h-2 rounded-full"
@@ -761,11 +754,10 @@ export const Calendar: React.FC = () => {
                   key={d.id}
                   type="button"
                   onClick={() => setSelectedDepartmentId(isSelected ? null : d.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-nearblack text-white shadow-sm'
-                      : 'bg-white/55 text-secondary hover:text-graphite border border-white/60 hover:bg-white/80'
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 ${isSelected
+                    ? 'bg-nearblack text-white shadow-sm'
+                    : 'bg-white/55 text-secondary hover:text-graphite border border-white/60 hover:bg-white/80'
+                    }`}
                 >
                   <span
                     className="w-1.5 h-1.5 rounded-full"
@@ -843,22 +835,20 @@ export const Calendar: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setViewMode('month')}
-                      className={`px-4 py-1 rounded-full font-medium transition-all ${
-                        viewMode === 'month'
-                          ? 'bg-nearblack text-white shadow-sm'
-                          : 'text-secondary hover:text-graphite'
-                      }`}
+                      className={`px-4 py-1 rounded-full font-medium transition-all ${viewMode === 'month'
+                        ? 'bg-nearblack text-white shadow-sm'
+                        : 'text-secondary hover:text-graphite'
+                        }`}
                     >
                       Month
                     </button>
                     <button
                       type="button"
                       onClick={() => setViewMode('week')}
-                      className={`px-4 py-1 rounded-full font-medium transition-all ${
-                        viewMode === 'week'
-                          ? 'bg-nearblack text-white shadow-sm'
-                          : 'text-secondary hover:text-graphite'
-                      }`}
+                      className={`px-4 py-1 rounded-full font-medium transition-all ${viewMode === 'week'
+                        ? 'bg-nearblack text-white shadow-sm'
+                        : 'text-secondary hover:text-graphite'
+                        }`}
                     >
                       Week
                     </button>
@@ -911,13 +901,12 @@ export const Calendar: React.FC = () => {
                               key={`mobile_${dayKey}`}
                               type="button"
                               onClick={() => setSelectedMobileDay(day)}
-                              className={`h-11 rounded-2xl flex flex-col items-center justify-center p-1 relative transition-all active:scale-95 ${
-                                isSelected
-                                  ? 'bg-nearblack text-white shadow-sm'
-                                  : isDayToday
+                              className={`h-11 rounded-2xl flex flex-col items-center justify-center p-1 relative transition-all active:scale-95 ${isSelected
+                                ? 'bg-nearblack text-white shadow-sm'
+                                : isDayToday
                                   ? 'bg-white/80 text-nearblack font-semibold border border-lime ring-1 ring-lime/50'
                                   : 'hover:bg-white/60 text-graphite'
-                              } ${!isCurrentMonth ? 'opacity-30' : ''}`}
+                                } ${!isCurrentMonth ? 'opacity-30' : ''}`}
                             >
                               <span className="text-xs sm:text-sm font-normal leading-none">
                                 {format(day, 'd')}
@@ -984,9 +973,8 @@ export const Calendar: React.FC = () => {
                                     <div
                                       key={task.id}
                                       onClick={() => setSelectedTaskForDrawer(task)}
-                                      className={`p-3 rounded-2xl bg-white/70 border border-black/[0.05] shadow-xs flex items-center gap-2.5 transition-all active:scale-[0.99] cursor-pointer ${
-                                        isDone ? 'opacity-50 line-through' : ''
-                                      }`}
+                                      className={`p-3 rounded-2xl bg-white/70 border border-black/[0.05] shadow-xs flex items-center gap-2.5 transition-all active:scale-[0.99] cursor-pointer ${isDone ? 'opacity-50 line-through' : ''
+                                        }`}
                                     >
                                       <button
                                         type="button"
@@ -1131,11 +1119,10 @@ export const Calendar: React.FC = () => {
                         return (
                           <div
                             key={dayKey}
-                            className={`min-w-[240px] sm:min-w-0 flex-1 shrink-0 snap-start rounded-[24px] p-3 border flex flex-col justify-between min-h-[480px] relative transition-all ${
-                              isDayToday
-                                ? 'bg-charcoal text-white border-charcoal shadow-md'
-                                : 'bg-inner-surface text-graphite border-white/60'
-                            }`}
+                            className={`min-w-[240px] sm:min-w-0 flex-1 shrink-0 snap-start rounded-[24px] p-3 border flex flex-col justify-between min-h-[480px] relative transition-all ${isDayToday
+                              ? 'bg-charcoal text-white border-charcoal shadow-md'
+                              : 'bg-inner-surface text-graphite border-white/60'
+                              }`}
                           >
                             {/* Column Header */}
                             <div className="pb-2 mb-2 border-b border-black/[0.05] flex items-center justify-between">
@@ -1175,11 +1162,10 @@ export const Calendar: React.FC = () => {
                                     <div
                                       key={t.id}
                                       onClick={() => setSelectedTaskForDrawer(t)}
-                                      className={`p-3 rounded-2xl text-xs border shadow-xs transition-all cursor-pointer hover:shadow-sm ${
-                                        isDayToday
-                                          ? 'bg-white/15 border-white/20 text-white'
-                                          : 'bg-white text-graphite border-black/[0.05]'
-                                      } ${isDone ? 'opacity-50 line-through' : ''}`}
+                                      className={`p-3 rounded-2xl text-xs border shadow-xs transition-all cursor-pointer hover:shadow-sm ${isDayToday
+                                        ? 'bg-white/15 border-white/20 text-white'
+                                        : 'bg-white text-graphite border-black/[0.05]'
+                                        } ${isDone ? 'opacity-50 line-through' : ''}`}
                                     >
                                       <div className="flex items-center gap-1.5 mb-1 text-[11px] opacity-75">
                                         <span
@@ -1268,11 +1254,10 @@ export const Calendar: React.FC = () => {
                           type="button"
                           aria-label="Toggle complete"
                           onClick={() => handleToggleTask(task)}
-                          className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 ${
-                            isCompleted
-                              ? 'bg-lime border-lime text-graphite'
-                              : 'border-black/25 bg-white/70 hover:border-black/50'
-                          }`}
+                          className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 ${isCompleted
+                            ? 'bg-lime border-lime text-graphite'
+                            : 'border-black/25 bg-white/70 hover:border-black/50'
+                            }`}
                         >
                           {isCompleted && <Check size={12} strokeWidth={3} />}
                         </button>
@@ -1294,11 +1279,10 @@ export const Calendar: React.FC = () => {
                           </div>
 
                           <div
-                            className={`text-xs sm:text-[13px] font-normal transition-all ${
-                              isCompleted
-                                ? 'line-through text-graphite/40'
-                                : 'text-graphite'
-                            }`}
+                            className={`text-xs sm:text-[13px] font-normal transition-all ${isCompleted
+                              ? 'line-through text-graphite/40'
+                              : 'text-graphite'
+                              }`}
                           >
                             {task.title}
                           </div>
@@ -1507,20 +1491,18 @@ export const Calendar: React.FC = () => {
                           e.stopPropagation();
                           handleToggleTask(task);
                         }}
-                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 ${
-                          isDone
-                            ? 'bg-lime border-lime text-graphite'
-                            : 'border-black/25 bg-white'
-                        }`}
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 ${isDone
+                          ? 'bg-lime border-lime text-graphite'
+                          : 'border-black/25 bg-white'
+                          }`}
                       >
                         {isDone && <Check size={12} strokeWidth={3} />}
                       </button>
 
                       <div className="flex-1 min-w-0">
                         <div
-                          className={`text-xs sm:text-sm font-normal text-graphite ${
-                            isDone ? 'line-through text-graphite/40' : ''
-                          }`}
+                          className={`text-xs sm:text-sm font-normal text-graphite ${isDone ? 'line-through text-graphite/40' : ''
+                            }`}
                         >
                           {task.title}
                         </div>

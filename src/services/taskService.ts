@@ -128,17 +128,25 @@ export async function createTaskWithContext(
   try {
     // Persist to Google Sheets backend
     const saved = await api.create('Tasks', newTask);
-    
-    // Sync backend-returned record (which may have server-generated id)
+
+    // Sync backend-returned record (with canonical UUID and persisted fields)
     if (saved && saved.id) {
       queryClient.setQueryData<TaskItem[]>(['Tasks'], (old = []) =>
         old.map((t) => (t.id === newTask.id ? (saved as TaskItem) : t))
       );
     }
+
+    // Invalidate queries to ensure counts and project pipelines re-verify
+    queryClient.invalidateQueries({ queryKey: ['Tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['Projects'] });
+
     return (saved as TaskItem) || newTask;
   } catch (error) {
     console.error('Failed to create task on backend:', error);
-    // Keep optimistic item in local cache, queryClient handles offline/local state
-    return newTask;
+    // Roll back optimistic record on network or backend failure
+    queryClient.setQueryData<TaskItem[]>(['Tasks'], (old = []) =>
+      old.filter((t) => t.id !== newTask.id)
+    );
+    throw error;
   }
 }

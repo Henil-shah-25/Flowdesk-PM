@@ -1,4 +1,5 @@
 import type { TabName, TabRecordMap } from '../../types';
+import { broadcastSyncMutation } from '../syncService';
 import {
   API_URL,
   API_TOKEN,
@@ -56,19 +57,10 @@ export const api = {
       try {
         const remoteData = await remoteRequest<Array<TabRecordMap[T]>>('list', { tab });
         if (Array.isArray(remoteData)) {
-          // Merge with any client-extended fields in local storage
-          const localItems = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
-          const localMap = new Map(localItems.map((item) => [String(item.id || item.key), item]));
-          const mergedData = remoteData.map((remoteItem) => {
-            const rObj = remoteItem as unknown as Record<string, unknown>;
-            const lObj = localMap.get(String(rObj.id || rObj.key));
-            if (lObj) {
-              return { ...lObj, ...rObj };
-            }
-            return remoteItem;
-          });
-          setLocalTable(tab, mergedData as Array<TabRecordMap[T]>);
-          return mergedData as Array<TabRecordMap[T]>;
+          // Google Sheets is the shared single source of truth for online mode.
+          // Store remote records directly to update offline cache.
+          setLocalTable(tab, remoteData as Array<TabRecordMap[T]>);
+          return remoteData;
         }
       } catch (err) {
         console.warn(`Remote list for ${tab} failed, using local cache:`, err);
@@ -106,7 +98,7 @@ export const api = {
     if (isLiveApiConfigured) {
       try {
         const remoteItem = await remoteRequest<TabRecordMap[T]>('create', { tab, row });
-        // Sync backend-confirmed record into local cache, merging with any client fields
+        // Sync backend-confirmed record into local cache
         const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
         const remoteObj = remoteItem as unknown as Record<string, unknown>;
         const mergedObj = { ...(row as Record<string, unknown>), ...remoteObj };
@@ -119,9 +111,11 @@ export const api = {
           items.push(mergedObj);
         }
         setLocalTable(tab, items);
+        broadcastSyncMutation(tab);
         return mergedObj as unknown as TabRecordMap[T];
       } catch (err) {
-        console.warn(`Remote create for ${tab} failed, falling back to local:`, err);
+        console.warn(`Remote create for ${tab} failed:`, err);
+        throw err;
       }
     }
 
@@ -135,6 +129,7 @@ export const api = {
 
     items.push(newRecord);
     setLocalTable(tab, items);
+    broadcastSyncMutation(tab);
     return newRecord as unknown as TabRecordMap[T];
   },
 
@@ -155,9 +150,11 @@ export const api = {
           items[index] = { ...items[index], ...remoteObj, ...(patch as Record<string, unknown>) };
           setLocalTable(tab, items);
         }
+        broadcastSyncMutation(tab);
         return { ...remoteUpdated, ...(patch as Record<string, unknown>) } as unknown as TabRecordMap[T];
       } catch (err) {
-        console.warn(`Remote update for ${tab} failed, falling back to local:`, err);
+        console.warn(`Remote update for ${tab} failed:`, err);
+        throw err;
       }
     }
 
@@ -175,6 +172,7 @@ export const api = {
       };
       items.push(createdItem);
       setLocalTable(tab, items);
+      broadcastSyncMutation(tab);
       return createdItem as unknown as TabRecordMap[T];
     }
 
@@ -185,6 +183,7 @@ export const api = {
 
     items[index] = updated;
     setLocalTable(tab, items);
+    broadcastSyncMutation(tab);
     return updated as unknown as TabRecordMap[T];
   },
 
@@ -197,9 +196,11 @@ export const api = {
           (item) => String(item.id) !== String(id) && !(tab === 'Settings' && String(item.key) === String(id))
         );
         setLocalTable(tab, filtered);
+        broadcastSyncMutation(tab);
         return res;
       } catch (err) {
-        console.warn(`Remote delete for ${tab} failed, falling back to local:`, err);
+        console.warn(`Remote delete for ${tab} failed:`, err);
+        throw err;
       }
     }
 
@@ -209,6 +210,7 @@ export const api = {
     );
 
     setLocalTable(tab, filtered);
+    broadcastSyncMutation(tab);
     return { deleted: true, id };
   },
 
@@ -231,9 +233,11 @@ export const api = {
           if (key) itemMap.set(key, row);
         });
         setLocalTable(tab, Array.from(itemMap.values()));
+        broadcastSyncMutation(tab);
         return remoteResults;
       } catch (err) {
-        console.warn(`Remote batchUpdate for ${tab} failed, falling back to local:`, err);
+        console.warn(`Remote batchUpdate for ${tab} failed:`, err);
+        throw err;
       }
     }
 
@@ -265,6 +269,7 @@ export const api = {
     });
 
     setLocalTable(tab, Array.from(itemMap.values()));
+    broadcastSyncMutation(tab);
     return results as unknown as Array<TabRecordMap[T]>;
   },
 
@@ -281,9 +286,11 @@ export const api = {
           (item) => !idSet.has(String(item.id)) && !(tab === 'Settings' && idSet.has(String(item.key)))
         );
         setLocalTable(tab, filtered);
+        broadcastSyncMutation(tab);
         return res;
       } catch (err) {
-        console.warn(`Remote batchDelete for ${tab} failed, falling back to local:`, err);
+        console.warn(`Remote batchDelete for ${tab} failed:`, err);
+        throw err;
       }
     }
 
@@ -295,6 +302,7 @@ export const api = {
 
     const deletedCount = items.length - filtered.length;
     setLocalTable(tab, filtered);
+    broadcastSyncMutation(tab);
     return { deleted: deletedCount, ids };
   },
 
