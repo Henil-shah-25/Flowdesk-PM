@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Modal, Button } from '../ui';
+import { Modal } from '../ui';
 import { useTableData } from '../../hooks/useData';
 import { useToast } from '../common/Toast';
 import { createTaskWithContext } from '../../services/taskService';
 import type { TaskItem } from '../../types';
-import { Check, Calendar, Clock, User, Layers, Tag } from 'lucide-react';
+import { Calendar, Clock, User, Layers, Tag } from 'lucide-react';
 
 export interface NewTaskModalProps {
   isOpen: boolean;
