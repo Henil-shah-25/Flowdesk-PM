@@ -22,6 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button, IconButton } from '../ui';
 import { TaskDetailDrawer } from './TaskDetailDrawer';
+import { StageModal } from './StageModal';
 import { useTableData } from '../../hooks/useData';
 import type { TaskItem, Stage, StageKind, StageColor, TeamMember } from '../../types';
 import {
@@ -34,9 +35,12 @@ import {
   ChevronRight,
   Trash2,
   AlertCircle,
+  AlertTriangle,
   Check,
   Sparkles,
   User,
+  Settings2,
+  Archive,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -60,6 +64,8 @@ export interface PipelineBoardProps {
   onReorderStages: (stages: Stage[]) => void;
   onTurnDepartmentOn?: () => void;
   onBrowseTemplates?: () => void;
+  onOpenAddStage?: () => void;
+  onOpenEditStage?: (stage: Stage) => void;
 }
 
 // Stage Color Palette Constants - Medium Tones
@@ -453,7 +459,7 @@ function ColumnDroppable({
   return (
     <div
       ref={setNodeRef}
-      data-stage-column={stage.name}
+      data-stage-droppable={stage.name}
       className="flex-1 space-y-3 min-h-[160px] max-h-[calc(100vh-320px)] overflow-y-auto pr-1 no-scrollbar"
     >
       {tasks.length === 0 ? (
@@ -480,7 +486,10 @@ function ColumnDroppable({
 // MAIN PIPELINE BOARD COMPONENT
 // -----------------------------------------------------------------------------
 export const PipelineBoard: React.FC<PipelineBoardProps> = ({
+  projectId,
   projectName,
+  departmentId,
+  department,
   stages,
   tasks,
   isReadOnly = false,
@@ -496,9 +505,12 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
   onReorderStages,
   onTurnDepartmentOn,
   onBrowseTemplates,
+  onOpenAddStage,
+  onOpenEditStage,
 }) => {
   // Mobile active stage for 390px viewports
   const [mobileActiveStageId, setMobileActiveStageId] = useState<string | null>(null);
+  const [mobileStageMenuOpen, setMobileStageMenuOpen] = useState(false);
   const [moveStagePickerTaskId, setMoveStagePickerTaskId] = useState<string | null>(null);
   const touchStartX = useRef<number | null>(null);
 
@@ -510,6 +522,33 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
 
   // Quick add per stage
   const [quickAddTexts, setQuickAddTexts] = useState<Record<string, string>>({});
+
+  // Internal StageModal state if not driven externally
+  const [internalStageModalOpen, setInternalStageModalOpen] = useState(false);
+  const [internalStageModalMode, setInternalStageModalMode] = useState<'create' | 'edit'>('create');
+  const [internalEditingStage, setInternalEditingStage] = useState<Stage | null>(null);
+
+  const handleOpenAdd = () => {
+    if (onOpenAddStage) {
+      onOpenAddStage();
+    } else {
+      setInternalEditingStage(null);
+      setInternalStageModalMode('create');
+      setInternalStageModalOpen(true);
+    }
+  };
+
+  const handleOpenEdit = (stg: Stage) => {
+    setActiveMenuStageId(null);
+    setMobileStageMenuOpen(false);
+    if (onOpenEditStage) {
+      onOpenEditStage(stg);
+    } else {
+      setInternalEditingStage(stg);
+      setInternalStageModalMode('edit');
+      setInternalStageModalOpen(true);
+    }
+  };
 
   // Stage rename state
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
@@ -563,15 +602,21 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
     return [...stages].sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
   }, [stages]);
 
-  // Stage calculations
+  // Stage calculations with WIP limit evaluation
   const stageStats = useMemo(() => {
-    const stats: Record<string, { count: number; totalMinutes: number }> = {};
+    const stats: Record<string, { count: number; totalMinutes: number; isOverWip: boolean }> = {};
     sortedStages.forEach((stage) => {
       const stageTasks = filteredTasks.filter((t) => t.stage_id === stage.id);
       const totalMinutes = stageTasks.reduce((acc, t) => acc + (t.estimate_min || 0), 0);
+      const isOverWip = Boolean(
+        stage.wip_limit &&
+        stage.wip_limit > 0 &&
+        stageTasks.length > stage.wip_limit
+      );
       stats[stage.id] = {
         count: stageTasks.length,
         totalMinutes,
+        isOverWip,
       };
     });
     return stats;
@@ -749,6 +794,8 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
     const isDone = stageObj?.kind === 'done';
 
     onCreateTask({
+      project_id: projectId,
+      department_id: departmentId,
       stage_id: stageId,
       title: text,
       priority: 'medium',
@@ -821,6 +868,22 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
     const reordered = newStages.map((s, idx) => ({ ...s, order: idx + 1 }));
     onReorderStages(reordered);
     setActiveMenuStageId(null);
+    setMobileStageMenuOpen(false);
+  };
+
+  // Stage archive toggle
+  const handleToggleArchiveStage = (stage: Stage) => {
+    const isCurrentlyArchived = Boolean(stage.is_archived);
+    if (!isCurrentlyArchived) {
+      const activeStages = sortedStages.filter((s) => !s.is_archived);
+      if (activeStages.length <= 1) {
+        alert('Cannot archive the only active stage in this pipeline.');
+        return;
+      }
+    }
+    onUpdateStage(stage.id, { is_archived: !isCurrentlyArchived });
+    setActiveMenuStageId(null);
+    setMobileStageMenuOpen(false);
   };
 
   // Stage deletion initiation
@@ -1020,10 +1083,11 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
         }}
       >
         {/* Horizontal Status Selector Tab Strip */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
+        <div role="tablist" aria-label="Pipeline stages" className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
           {sortedStages.map((stage) => {
             const isActive = (mobileActiveStageId || sortedStages[0]?.id) === stage.id;
-            const count = stageStats[stage.id]?.count || 0;
+            const stats = stageStats[stage.id] || { count: 0, totalMinutes: 0, isOverWip: false };
+            const count = stats.count;
             const colorDef = getStageColorConfig(stage.color, stage.kind);
 
             return (
@@ -1044,14 +1108,36 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
                 <span className="font-medium">{stage.name}</span>
                 <span
                   className={`text-[11px] px-1.5 py-0.2 rounded-full font-semibold ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-black/5 text-graphite'
+                    stats.isOverWip
+                      ? 'bg-coral text-white'
+                      : isActive
+                      ? 'bg-white/20 text-white'
+                      : 'bg-black/5 text-graphite'
                   }`}
+                  title={stage.wip_limit ? `WIP Limit: ${stage.wip_limit}` : undefined}
                 >
-                  {count}
+                  {stage.wip_limit ? `${count}/${stage.wip_limit}` : count}
                 </span>
+                {stage.is_archived && (
+                  <span className="text-[9px] uppercase px-1 py-0.2 rounded bg-black/10 text-secondary font-bold">
+                    Archived
+                  </span>
+                )}
               </button>
             );
           })}
+
+          {/* Convenient Mobile + Stage Button */}
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={handleOpenAdd}
+              className="px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all border border-dashed border-black/25 bg-white/50 hover:bg-white text-graphite flex items-center gap-1.5 shrink-0 shadow-xs active:scale-95"
+            >
+              <Plus size={13} strokeWidth={2.5} />
+              <span>Add Stage</span>
+            </button>
+          )}
         </div>
 
         {/* Active Stage Single View */}
@@ -1063,13 +1149,15 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
 
           const activeColorDef = getStageColorConfig(activeStage.color, activeStage.kind);
           const activeTasks = filteredTasks.filter((t) => t.stage_id === activeStage.id);
-          const activeStats = stageStats[activeStage.id] || { count: 0, totalMinutes: 0 };
+          const activeStats = stageStats[activeStage.id] || { count: 0, totalMinutes: 0, isOverWip: false };
           const currentIndex = sortedStages.findIndex((s) => s.id === activeStage.id);
 
           return (
             <div
               data-stage-column={activeStage.name}
-              className="rounded-[24px] bg-panel backdrop-blur-[24px] border border-white/60 p-4 space-y-4 shadow-glass"
+              className={`rounded-[24px] bg-panel backdrop-blur-[24px] border p-4 space-y-4 shadow-glass transition-colors ${
+                activeStats.isOverWip ? 'border-coral/60 ring-1 ring-coral/20' : 'border-white/60'
+              }`}
             >
               {/* Active Stage Header & Controls */}
               <div className="flex items-center justify-between pb-3 border-b border-black/[0.05]">
@@ -1081,12 +1169,27 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
                   <div className="min-w-0">
                     <h3 className="font-medium text-base text-graphite truncate flex items-center gap-1.5">
                       <span>{activeStage.name}</span>
-                      <span className="text-xs text-secondary font-normal">
-                        ({activeTasks.length})
+                      <span
+                        className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          activeStats.isOverWip
+                            ? 'bg-coral/20 text-coral border border-coral/30'
+                            : 'text-secondary font-normal'
+                        }`}
+                      >
+                        {activeStage.wip_limit
+                          ? `(${activeTasks.length}/${activeStage.wip_limit})`
+                          : `(${activeTasks.length})`}
                       </span>
+                      {activeStats.isOverWip && (
+                        <span className="text-[10px] text-coral font-medium flex items-center gap-0.5 animate-pulse">
+                          <AlertTriangle size={11} />
+                          <span>Over WIP</span>
+                        </span>
+                      )}
                     </h3>
-                    <p className="text-[11px] text-secondary">
+                    <p className="text-[11px] text-secondary truncate">
                       {formatTotalMinutes(activeStats.totalMinutes)} total
+                      {activeStage.description ? ` • ${activeStage.description}` : ''}
                     </p>
                   </div>
                 </div>
@@ -1111,6 +1214,72 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
                   >
                     <ChevronRight size={14} />
                   </button>
+
+                  {/* Mobile Stage Options Menu */}
+                  {!isReadOnly && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setMobileStageMenuOpen(!mobileStageMenuOpen)}
+                        className="w-7 h-7 rounded-full bg-white/60 hover:bg-white border border-white/70 flex items-center justify-center text-graphite transition-all"
+                        title="Stage options"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+
+                      {mobileStageMenuOpen && (
+                        <div className="absolute right-0 top-full mt-1.5 w-48 p-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-black/[0.08] shadow-lg z-30 flex flex-col gap-0.5 text-xs text-graphite">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(activeStage)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-black/[0.05] transition-colors text-left"
+                          >
+                            <Settings2 size={13} className="text-secondary" />
+                            <span>Edit Stage</span>
+                          </button>
+                          <div className="flex items-center justify-between px-3 py-1.5 text-secondary border-t border-black/[0.04]">
+                            <span className="text-[11px]">Reorder</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={currentIndex <= 0}
+                                onClick={() => handleMoveStage(activeStage.id, 'left')}
+                                className="p-1 rounded hover:bg-black/5 disabled:opacity-30"
+                                title="Move left"
+                              >
+                                <ArrowLeft size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={currentIndex >= sortedStages.length - 1}
+                                onClick={() => handleMoveStage(activeStage.id, 'right')}
+                                className="p-1 rounded hover:bg-black/5 disabled:opacity-30"
+                                title="Move right"
+                              >
+                                <ArrowRight size={12} />
+                              </button>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleArchiveStage(activeStage)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-black/[0.05] transition-colors text-left border-t border-black/[0.04]"
+                          >
+                            <Archive size={13} className="text-secondary" />
+                            <span>{activeStage.is_archived ? 'Unarchive Stage' : 'Archive Stage'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleInitiateDeleteStage(activeStage)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-coral/10 text-coral transition-colors text-left border-t border-black/[0.04]"
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete Stage</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Direct + Add Task Button for this status */}
                   {!isReadOnly && (
@@ -1367,9 +1536,32 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
                       </span>
                     )}
 
-                    <span className="w-5 h-5 rounded-full bg-white/65 border border-white/80 text-[11px] text-secondary font-medium flex items-center justify-center shrink-0">
-                      {columnTasks.length}
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-semibold transition-all ${
+                        stats.isOverWip
+                          ? 'bg-coral/20 text-coral border border-coral/30'
+                          : 'bg-white/65 border border-white/80 text-secondary'
+                      }`}
+                      title={stage.wip_limit ? `WIP Limit: ${stage.wip_limit} tasks` : undefined}
+                    >
+                      {stage.wip_limit ? `${columnTasks.length}/${stage.wip_limit}` : columnTasks.length}
                     </span>
+
+                    {stats.isOverWip && (
+                      <span
+                        className="text-[10px] font-medium text-coral flex items-center gap-0.5 animate-pulse"
+                        title="Stage WIP limit exceeded"
+                      >
+                        <AlertTriangle size={11} />
+                        <span className="hidden xl:inline">Over WIP</span>
+                      </span>
+                    )}
+
+                    {stage.is_archived && (
+                      <span className="text-[9px] uppercase px-1.5 py-0.2 rounded bg-black/10 text-secondary font-bold">
+                        Archived
+                      </span>
+                    )}
                   </div>
 
                   {/* Right Header items: Total Time & Quick Add + Options Menu */}
@@ -1410,105 +1602,57 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
 
                         {/* Dropdown Popover */}
                         {activeMenuStageId === stage.id && (
-                          <div className="absolute right-0 top-8 w-54 rounded-2xl bg-white/95 backdrop-blur-[24px] border border-white/80 shadow-[0_14px_40px_rgba(20,25,30,0.18)] p-3 z-30 space-y-2 text-xs">
+                          <div className="absolute right-0 top-8 w-52 rounded-2xl bg-white/95 backdrop-blur-[24px] border border-white/80 shadow-[0_14px_40px_rgba(20,25,30,0.18)] p-2 z-30 space-y-1 text-xs">
                             <button
                               type="button"
-                              onClick={() => {
-                                handleStartRename(stage);
-                                setActiveMenuStageId(null);
-                              }}
-                              className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-black/5 font-medium text-graphite"
+                              onClick={() => handleOpenEdit(stage)}
+                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 font-medium text-graphite flex items-center gap-2"
                             >
-                              Rename Stage
+                              <Settings2 size={13} className="text-secondary" />
+                              <span>Edit Stage</span>
                             </button>
 
-                            {/* 6-Swatch Color Picker */}
-                            <div className="pt-1 border-t border-black/[0.04]">
-                              <div className="text-[11px] text-secondary mb-1.5 px-1 font-medium">
-                                Stage Color:
-                              </div>
-                              <div className="flex items-center justify-between px-1">
-                                {STAGE_COLORS.map((c) => {
-                                  const isSelected = (stage.color || 'sky') === c.name;
-                                  return (
-                                    <button
-                                      key={c.name}
-                                      type="button"
-                                      title={c.label}
-                                      onClick={() => handleChangeStageColor(stage, c.name)}
-                                      style={{ backgroundColor: c.hex }}
-                                      className={`w-5 h-5 rounded-full border transition-all flex items-center justify-center ${
-                                        isSelected
-                                          ? 'ring-2 ring-nearblack ring-offset-1 border-transparent'
-                                          : 'border-black/10 hover:scale-110'
-                                      }`}
-                                    >
-                                      {isSelected && <Check size={10} className="text-graphite stroke-[3]" />}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Stage Type Toggle */}
-                            <div className="pt-1 border-t border-black/[0.04] space-y-1">
-                              <div className="text-[11px] text-secondary px-1 font-medium">
-                                Stage Type:
-                              </div>
-                              {(['normal', 'done', 'blocked'] as const).map((k) => (
-                                <button
-                                  key={k}
-                                  type="button"
-                                  onClick={() => handleChangeStageType(stage, k)}
-                                  className={`w-full px-2.5 py-1 rounded-xl text-left capitalize flex items-center justify-between ${
-                                    stage.kind === k
-                                      ? 'bg-black/5 font-semibold text-graphite'
-                                      : 'hover:bg-black/5 text-secondary'
-                                  }`}
-                                >
-                                  <span>{k}</span>
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full ${
-                                      k === 'done'
-                                        ? 'bg-lime'
-                                        : k === 'blocked'
-                                        ? 'bg-coral'
-                                        : 'bg-black/30'
-                                    }`}
-                                  />
-                                </button>
-                              ))}
-                            </div>
-
                             {/* Reorder Buttons */}
-                            <div className="pt-1 border-t border-black/[0.04] flex items-center justify-between px-1">
-                              <button
-                                type="button"
-                                onClick={() => handleMoveStage(stage.id, 'left')}
-                                className="p-1 rounded-lg hover:bg-black/5 text-secondary hover:text-graphite"
-                                title="Move stage left"
-                              >
-                                <ArrowLeft size={13} />
-                              </button>
-                              <span className="text-[11px] text-secondary">Reorder</span>
-                              <button
-                                type="button"
-                                onClick={() => handleMoveStage(stage.id, 'right')}
-                                className="p-1 rounded-lg hover:bg-black/5 text-secondary hover:text-graphite"
-                                title="Move stage right"
-                              >
-                                <ArrowRight size={13} />
-                              </button>
+                            <div className="pt-1 border-t border-black/[0.04] flex items-center justify-between px-2.5 py-1 text-secondary">
+                              <span className="text-[11px]">Reorder</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveStage(stage.id, 'left')}
+                                  className="p-1 rounded-lg hover:bg-black/5 text-secondary hover:text-graphite"
+                                  title="Move stage left"
+                                >
+                                  <ArrowLeft size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveStage(stage.id, 'right')}
+                                  className="p-1 rounded-lg hover:bg-black/5 text-secondary hover:text-graphite"
+                                  title="Move stage right"
+                                >
+                                  <ArrowRight size={13} />
+                                </button>
+                              </div>
                             </div>
+
+                            {/* Archive Stage */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleArchiveStage(stage)}
+                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 text-secondary hover:text-graphite flex items-center gap-2 border-t border-black/[0.04]"
+                            >
+                              <Archive size={13} />
+                              <span>{stage.is_archived ? 'Unarchive Stage' : 'Archive Stage'}</span>
+                            </button>
 
                             {/* Delete Stage */}
                             <div className="pt-1 border-t border-black/[0.04]">
                               <button
                                 type="button"
                                 onClick={() => handleInitiateDeleteStage(stage)}
-                                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-coral/10 text-left flex items-center gap-2 text-coral font-medium"
+                                className="w-full px-3 py-2 rounded-xl hover:bg-coral/10 text-left flex items-center gap-2 text-coral font-medium"
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={13} />
                                 <span>Delete Stage</span>
                               </button>
                             </div>
@@ -1518,6 +1662,13 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Optional Stage Description */}
+                {stage.description && (
+                  <p className="text-[11px] text-secondary line-clamp-1 px-1 -mt-2 mb-2.5" title={stage.description}>
+                    {stage.description}
+                  </p>
+                )}
 
                 {/* Sortable Tasks List with Droppable Stage Container */}
                 <SortableContext
@@ -1561,85 +1712,19 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
           })}
 
           {/* Add Stage Column (Rightmost) */}
-          {!isReadOnly && sortedStages.length < 8 && (
+          {!isReadOnly && (
             <div className="w-72 rounded-[28px] bg-panel/75 backdrop-blur-[24px] border border-dashed border-black/[0.15] p-5 flex flex-col justify-start shrink-0">
-              {isAddingStage ? (
-                <form onSubmit={handleAddStageSubmit} className="space-y-3">
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="Stage name (e.g. Review)..."
-                    value={newStageName}
-                    onChange={(e) => setNewStageName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-white/80 border border-white/90 text-graphite focus:outline-none focus:ring-2 focus:ring-nearblack/20"
-                  />
-
-                  {/* Stage Color Swatches */}
-                  <div>
-                    <label className="block text-[11px] text-secondary mb-1">Color</label>
-                    <div className="flex items-center gap-1.5 justify-between">
-                      {STAGE_COLORS.map((c) => (
-                        <button
-                          key={c.name}
-                          type="button"
-                          onClick={() => setNewStageColor(c.name)}
-                          style={{ backgroundColor: c.hex }}
-                          className={`w-5 h-5 rounded-full border ${
-                            newStageColor === c.name
-                              ? 'ring-2 ring-nearblack ring-offset-1 border-transparent'
-                              : 'border-black/10'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] text-secondary mb-1">Stage Type</label>
-                    <div className="grid grid-cols-3 gap-1">
-                      {(['normal', 'done', 'blocked'] as const).map((k) => (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => setNewStageKind(k)}
-                          className={`py-1 text-[11px] rounded-lg capitalize border ${
-                            newStageKind === k
-                              ? 'bg-nearblack text-white border-nearblack font-medium'
-                              : 'bg-white/50 text-secondary border-white/70'
-                          }`}
-                        >
-                          {k}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-1.5 pt-1">
-                    <Button type="submit" variant="primary" size="sm" className="flex-1">
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsAddingStage(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsAddingStage(true)}
-                  className="w-full h-full min-h-[160px] flex flex-col items-center justify-center gap-2 text-secondary hover:text-graphite transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-white/60 border border-white/70 flex items-center justify-center shadow-xs">
-                    <Plus size={18} />
-                  </div>
-                  <span className="text-[13px] font-normal">+ Add stage</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleOpenAdd}
+                className="w-full h-full min-h-[160px] flex flex-col items-center justify-center gap-2 text-secondary hover:text-graphite transition-colors group cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-full bg-white/60 group-hover:bg-white border border-white/70 flex items-center justify-center shadow-xs transition-transform group-hover:scale-105">
+                  <Plus size={18} />
+                </div>
+                <span className="text-[13px] font-medium">+ Add stage</span>
+                <span className="text-[11px] text-secondary">Custom pipeline stage</span>
+              </button>
             </div>
           )}
         </div>
@@ -1717,6 +1802,44 @@ export const PipelineBoard: React.FC<PipelineBoardProps> = ({
           </div>
         </div>
       )}
+      {/* Internal StageModal */}
+      <StageModal
+        isOpen={internalStageModalOpen}
+        onClose={() => setInternalStageModalOpen(false)}
+        mode={internalStageModalMode}
+        stage={internalEditingStage}
+        departmentId={departmentId}
+        projectId={projectId}
+        existingStages={stages}
+        tasks={tasks}
+        onSave={(data) => {
+          if (internalStageModalMode === 'create') {
+            onCreateStage({
+              department_id: departmentId,
+              project_id: projectId,
+              name: data.name,
+              description: data.description,
+              kind: data.kind,
+              color: data.color,
+              order: data.order,
+              wip_limit: data.wip_limit,
+              is_archived: false,
+            });
+          } else if (internalEditingStage) {
+            onUpdateStage(internalEditingStage.id, {
+              name: data.name,
+              description: data.description,
+              kind: data.kind,
+              color: data.color,
+              wip_limit: data.wip_limit,
+              is_archived: data.is_archived,
+            });
+          }
+        }}
+        onDelete={(stageId, moveTasksToStageId) => {
+          onDeleteStage(stageId, moveTasksToStageId);
+        }}
+      />
     </div>
   );
 };

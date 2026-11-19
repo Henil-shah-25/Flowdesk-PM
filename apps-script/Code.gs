@@ -11,7 +11,7 @@ const CACHE_TTL_SECONDS = 600; // 10 minutes TTL
 const SCHEMAS = {
   Projects: ['id', 'parent_id', 'name', 'type', 'color', 'status', 'due_date', 'archived', 'created_at'],
   Departments: ['id', 'project_id', 'parent_id', 'name', 'color', 'enabled', 'order'],
-  Stages: ['id', 'department_id', 'name', 'kind', 'color', 'order'],
+  Stages: ['id', 'department_id', 'project_id', 'name', 'kind', 'color', 'order', 'description', 'wip_limit', 'is_archived', 'created_at', 'updated_at'],
   Tasks: ['id', 'project_id', 'department_id', 'stage_id', 'title', 'description', 'priority', 'estimate_min', 'actual_min', 'due_date', 'order', 'done_at', 'recurring', 'source', 'template_id', 'assignee_id', 'created_at'],
   Ideas: ['id', 'title', 'body', 'color', 'x', 'y', 'w', 'h', 'rotation', 'z', 'status', 'project_id', 'department_id', 'stage_id', 'created_at'],
   TimeLogs: ['id', 'task_id', 'project_id', 'mode', 'start', 'end', 'duration_min'],

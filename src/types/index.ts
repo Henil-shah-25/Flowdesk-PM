@@ -43,15 +43,21 @@ export interface Department {
 }
 
 export type StageKind = 'normal' | 'done' | 'blocked';
-export type StageColor = 'sky' | 'lime' | 'coral' | 'sage' | 'peach' | 'charcoal';
+export type StageColor = 'sky' | 'lime' | 'coral' | 'sage' | 'peach' | 'charcoal' | string;
 
 export interface Stage {
   id: string;
   department_id: string;
+  project_id?: string;
   name: string;
   kind: StageKind;
   color?: StageColor;
   order: number;
+  description?: string;
+  wip_limit?: number;
+  is_archived?: boolean | string | number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ChecklistItem {

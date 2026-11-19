@@ -23,7 +23,8 @@ import {
   DEFAULT_DEPARTMENT_SPECS,
   getDefaultEnabledDepartmentNames,
 } from '../lib/projectAutoSetup';
-import { Plus, FolderKanban, Check, Sparkles, Layers } from 'lucide-react';
+import { PIPELINE_TEMPLATES } from '../lib/pipelineTemplates';
+import { Plus, FolderKanban, Check, Sparkles, Layers, Workflow } from 'lucide-react';
 
 const PROJECT_TYPES: ProjectType[] = [
   'Project',
@@ -65,14 +66,22 @@ export const Projects: React.FC = () => {
   const [projectType, setProjectType] = useState<ProjectType>('Project');
   const [projectColor, setProjectColor] = useState('#CDD6A6');
   const [dueDate, setDueDate] = useState('');
+  const [pipelineTemplateId, setPipelineTemplateId] = useState<string>('software_dev');
   const [chosenDepartments, setChosenDepartments] = useState<string[]>(
     getDefaultEnabledDepartmentNames('Project')
   );
 
-  // When project type changes, pre-fill departments by type
+  // When project type changes, pre-fill departments & suggested pipeline
   const handleTypeChange = (newType: ProjectType) => {
     setProjectType(newType);
     setChosenDepartments(getDefaultEnabledDepartmentNames(newType));
+    if (newType === 'Marketing Campaign') {
+      setPipelineTemplateId('marketing_campaign');
+    } else if (newType === 'Research Campaign') {
+      setPipelineTemplateId('simple_kanban');
+    } else {
+      setPipelineTemplateId('software_dev');
+    }
   };
 
   const toggleChosenDepartment = (deptName: string) => {
@@ -124,8 +133,8 @@ export const Projects: React.FC = () => {
 
           if (newProj && newProj.id) {
             navigate(`/projects/${newProj.id}`);
-            // Run background sync for departments & default stages
-            autoSetupProject(newProj.id, projectType, chosenDepartments).then(() => {
+            // Run background sync for departments & chosen pipeline stages
+            autoSetupProject(newProj.id, projectType, chosenDepartments, pipelineTemplateId).then(() => {
               queryClient.invalidateQueries({ queryKey: ['Departments'] });
               queryClient.invalidateQueries({ queryKey: ['Stages'] });
               queryClient.invalidateQueries({ queryKey: ['Tasks'] });
@@ -435,6 +444,54 @@ export const Projects: React.FC = () => {
                           {spec.name}
                         </span>
                       </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Pipeline Workflow Template */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs text-secondary font-medium flex items-center gap-1.5">
+                    <Workflow size={13} className="text-secondary" />
+                    <span>Pipeline Workflow Template</span>
+                  </label>
+                  <span className="text-[11px] text-secondary">
+                    Customizable per department
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                  {PIPELINE_TEMPLATES.map((tmpl) => {
+                    const isSelected = pipelineTemplateId === tmpl.id;
+                    return (
+                      <button
+                        key={tmpl.id}
+                        type="button"
+                        onClick={() => setPipelineTemplateId(tmpl.id)}
+                        className={`p-2.5 rounded-2xl text-left border transition-all ${
+                          isSelected
+                            ? 'bg-nearblack text-white border-nearblack shadow-sm'
+                            : 'bg-white/50 text-graphite border-white/70 hover:bg-white/80'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium truncate">{tmpl.name}</span>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-black/5 text-secondary'
+                            }`}
+                          >
+                            {tmpl.stages.length} stages
+                          </span>
+                        </div>
+                        <p
+                          className={`text-[11px] line-clamp-1 mt-0.5 ${
+                            isSelected ? 'text-white/70' : 'text-secondary'
+                          }`}
+                        >
+                          {tmpl.stages.map((s) => s.name).join(' → ')}
+                        </p>
+                      </button>
                     );
                   })}
                 </div>

@@ -12,9 +12,10 @@ import { PipelineBoard } from '../components/kanban/PipelineBoard';
 import { Button, GlassCard, IconButton } from '../components/ui';
 import { TemplateModal } from '../components/departments/TemplateModal';
 import { NewTaskModal } from '../components/tasks/NewTaskModal';
+import { StageModal } from '../components/kanban/StageModal';
 import { useToast } from '../components/common/Toast';
 import { CountUp } from '../components/common/CountUp';
-import type { Department } from '../types';
+import type { Department, Stage } from '../types';
 import {
   ChevronRight,
   ArrowLeft,
@@ -28,6 +29,7 @@ import {
   Kanban,
   List as ListIcon,
   BookOpen,
+  Archive,
 } from 'lucide-react';
 import { isWithinInterval, addDays, startOfDay } from 'date-fns';
 
@@ -58,6 +60,10 @@ export function DepartmentPipeline() {
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isStageModalOpen, setIsStageModalOpen] = useState(false);
+  const [stageModalMode, setStageModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedStageForEdit, setSelectedStageForEdit] = useState<Stage | null>(null);
+  const [showArchivedStages, setShowArchivedStages] = useState(false);
 
   const currentProject = useMemo(() => {
     return projects.find((p) => p.id === projectId);
@@ -91,13 +97,19 @@ export function DepartmentPipeline() {
     };
   }, [currentDepartment, departments, projectId]);
 
-  // Stages for this specific department
+  // Count of archived stages for this department
+  const archivedStagesCount = useMemo(() => {
+    if (!departmentId) return 0;
+    return allStages.filter((s) => s.department_id === departmentId && Boolean(s.is_archived)).length;
+  }, [allStages, departmentId]);
+
+  // Stages for this specific department (filtered by archive state unless showArchivedStages is enabled)
   const stages = useMemo(() => {
     if (!departmentId) return [];
     return allStages
-      .filter((s) => s.department_id === departmentId)
+      .filter((s) => s.department_id === departmentId && (showArchivedStages || !s.is_archived))
       .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
-  }, [allStages, departmentId]);
+  }, [allStages, departmentId, showArchivedStages]);
 
   // Tasks for this specific department
   const tasks = useMemo(() => {
@@ -422,6 +434,22 @@ export function DepartmentPipeline() {
             onClick={handleExportTasks}
           />
 
+          {/* Archived Stages Toggle Pill (if any archived stages exist) */}
+          {archivedStagesCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowArchivedStages((prev) => !prev)}
+              className={`h-10 px-3.5 rounded-full border text-xs font-normal flex items-center gap-1.5 transition-all shadow-sm ${
+                showArchivedStages
+                  ? 'bg-nearblack text-white border-nearblack font-medium'
+                  : 'bg-white/55 hover:bg-white/80 border-white/60 text-graphite'
+              }`}
+            >
+              <Archive size={14} className={showArchivedStages ? 'text-white' : 'text-secondary'} />
+              <span>Archived ({archivedStagesCount})</span>
+            </button>
+          )}
+
           {/* Templates Button */}
           <button
             type="button"
@@ -431,6 +459,20 @@ export function DepartmentPipeline() {
             <BookOpen size={14} className="text-secondary" />
             <span>Templates</span>
           </button>
+
+          {/* Add Stage Button */}
+          <Button
+            variant="secondary"
+            size="md"
+            icon={<Plus size={15} />}
+            onClick={() => {
+              setSelectedStageForEdit(null);
+              setStageModalMode('create');
+              setIsStageModalOpen(true);
+            }}
+          >
+            Add stage
+          </Button>
 
           {/* Lime "+ New task" Button */}
           <Button
@@ -475,6 +517,16 @@ export function DepartmentPipeline() {
         viewMode={viewMode}
         searchQuery={searchQuery}
         onBrowseTemplates={() => setIsTemplateModalOpen(true)}
+        onOpenAddStage={() => {
+          setSelectedStageForEdit(null);
+          setStageModalMode('create');
+          setIsStageModalOpen(true);
+        }}
+        onOpenEditStage={(stg) => {
+          setSelectedStageForEdit(stg);
+          setStageModalMode('edit');
+          setIsStageModalOpen(true);
+        }}
         onUpdateTask={(taskId, patch) => updateTaskMutation.mutate({ id: taskId, patch })}
         onBatchUpdateTasks={(updates) => batchUpdateTasksMutation.mutate(updates)}
         onCreateTask={(task) => createTaskMutation.mutate(task)}
@@ -494,12 +546,11 @@ export function DepartmentPipeline() {
         onDeleteStage={(stageId, moveTasksToStageId) => {
           if (moveTasksToStageId) {
             const tasksInStage = tasks.filter((t) => t.stage_id === stageId);
-            tasksInStage.forEach((t) => {
-              updateTaskMutation.mutate({
-                id: t.id,
-                patch: { stage_id: moveTasksToStageId },
-              });
-            });
+            if (tasksInStage.length > 0) {
+              batchUpdateTasksMutation.mutate(
+                tasksInStage.map((t) => ({ id: t.id, stage_id: moveTasksToStageId }))
+              );
+            }
           }
           deleteStageMutation.mutate(stageId);
         }}
@@ -528,6 +579,70 @@ export function DepartmentPipeline() {
           departmentName={parentDepartment?.name || currentDepartment.name}
           subName={currentDepartment.parent_id ? currentDepartment.name : ''}
           startedStageId={stages.find((s) => s.kind === 'normal')?.id}
+        />
+      )}
+
+      {/* Custom Stage Creation & Editing Modal */}
+      {currentDepartment && (
+        <StageModal
+          isOpen={isStageModalOpen}
+          onClose={() => {
+            setIsStageModalOpen(false);
+            setSelectedStageForEdit(null);
+          }}
+          mode={stageModalMode}
+          stage={selectedStageForEdit}
+          departmentId={currentDepartment.id}
+          projectId={currentProject.id}
+          existingStages={stages}
+          tasks={tasks}
+          onSave={(data) => {
+            if (stageModalMode === 'create') {
+              createStageMutation.mutate({
+                id: crypto.randomUUID(),
+                department_id: currentDepartment.id,
+                project_id: currentProject.id,
+                name: data.name,
+                description: data.description,
+                kind: data.kind,
+                color: data.color,
+                order: data.order,
+                wip_limit: data.wip_limit,
+                is_archived: false,
+              });
+              showToast({ message: `Stage "${data.name}" created` });
+            } else if (selectedStageForEdit) {
+              updateStageMutation.mutate({
+                id: selectedStageForEdit.id,
+                patch: {
+                  name: data.name,
+                  description: data.description,
+                  kind: data.kind,
+                  color: data.color,
+                  wip_limit: data.wip_limit,
+                  is_archived: data.is_archived,
+                },
+              });
+              showToast({ message: `Stage "${data.name}" updated` });
+            }
+            setIsStageModalOpen(false);
+            setSelectedStageForEdit(null);
+          }}
+          onDelete={(stageId, moveTasksToStageId) => {
+            const stageToDelete = stages.find((s) => s.id === stageId);
+            if (moveTasksToStageId) {
+              const tasksInStage = tasks.filter((t) => t.stage_id === stageId);
+              if (tasksInStage.length > 0) {
+                batchUpdateTasksMutation.mutate(
+                  tasksInStage.map((t) => ({ id: t.id, stage_id: moveTasksToStageId }))
+                );
+              }
+            }
+            deleteStageMutation.mutate(stageId);
+            showToast({ message: `Stage "${stageToDelete?.name || ''}" deleted` });
+            setIsStageModalOpen(false);
+            setSelectedStageForEdit(null);
+          }}
         />
       )}
     </div>

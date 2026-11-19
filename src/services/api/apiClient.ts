@@ -56,8 +56,19 @@ export const api = {
       try {
         const remoteData = await remoteRequest<Array<TabRecordMap[T]>>('list', { tab });
         if (Array.isArray(remoteData)) {
-          setLocalTable(tab, remoteData);
-          return remoteData;
+          // Merge with any client-extended fields in local storage
+          const localItems = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
+          const localMap = new Map(localItems.map((item) => [String(item.id || item.key), item]));
+          const mergedData = remoteData.map((remoteItem) => {
+            const rObj = remoteItem as Record<string, unknown>;
+            const lObj = localMap.get(String(rObj.id || rObj.key));
+            if (lObj) {
+              return { ...lObj, ...rObj };
+            }
+            return remoteItem;
+          });
+          setLocalTable(tab, mergedData as Array<TabRecordMap[T]>);
+          return mergedData as Array<TabRecordMap[T]>;
         }
       } catch (err) {
         console.warn(`Remote list for ${tab} failed, using local cache:`, err);
@@ -95,19 +106,20 @@ export const api = {
     if (isLiveApiConfigured) {
       try {
         const remoteItem = await remoteRequest<TabRecordMap[T]>('create', { tab, row });
-        // Sync backend-confirmed record into local cache
+        // Sync backend-confirmed record into local cache, merging with any client fields
         const items = getLocalTable<unknown>(tab) as Array<Record<string, unknown>>;
         const remoteObj = remoteItem as unknown as Record<string, unknown>;
+        const mergedObj = { ...(row as Record<string, unknown>), ...remoteObj };
         const existingIdx = items.findIndex(
-          (i) => String(i.id) === String(remoteObj.id)
+          (i) => String(i.id) === String(remoteObj.id || (row as Record<string, unknown>).id)
         );
         if (existingIdx >= 0) {
-          items[existingIdx] = remoteObj;
+          items[existingIdx] = mergedObj;
         } else {
-          items.push(remoteObj);
+          items.push(mergedObj);
         }
         setLocalTable(tab, items);
-        return remoteItem;
+        return mergedObj as unknown as TabRecordMap[T];
       } catch (err) {
         console.warn(`Remote create for ${tab} failed, falling back to local:`, err);
       }
@@ -140,10 +152,10 @@ export const api = {
           (item) => String(item.id) === String(id) || (tab === 'Settings' && String(item.key) === String(id))
         );
         if (index >= 0) {
-          items[index] = { ...items[index], ...remoteObj };
+          items[index] = { ...items[index], ...remoteObj, ...(patch as Record<string, unknown>) };
           setLocalTable(tab, items);
         }
-        return remoteUpdated;
+        return { ...remoteUpdated, ...(patch as Record<string, unknown>) } as unknown as TabRecordMap[T];
       } catch (err) {
         console.warn(`Remote update for ${tab} failed, falling back to local:`, err);
       }

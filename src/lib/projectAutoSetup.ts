@@ -1,6 +1,7 @@
 import type { Project, Department, Stage, TaskItem, ProjectType } from '../types';
 import { INITIAL_STORAGE } from './mockData';
 import { api, isLiveApiConfigured } from './api';
+import { getPipelineTemplateById, type StageDefinition } from './pipelineTemplates';
 
 export interface DepartmentSpec {
   name: string;
@@ -112,7 +113,8 @@ function generateId(prefix: string): string {
 export function autoSetupProjectSync(
   projectId: string,
   projectType: string = 'Project',
-  chosenEnabledDepts?: string[]
+  chosenEnabledDepts?: string[],
+  pipelineTemplateId?: string
 ): { createdDepartmentsCount: number; createdStagesCount: number; createdTasksCount: number } {
   const departments = getStoredTable<Department>('Departments');
   const stages = getStoredTable<Stage>('Stages');
@@ -123,6 +125,14 @@ export function autoSetupProjectSync(
       ? chosenEnabledDepts
       : getDefaultEnabledDepartmentNames(projectType)
   );
+
+  const effectiveTemplateId = pipelineTemplateId || (
+    projectType === 'Marketing Campaign' ? 'marketing_campaign' :
+    projectType === 'Research Campaign' ? 'simple_kanban' :
+    'default'
+  );
+  const templateConfig = getPipelineTemplateById(effectiveTemplateId);
+  const stagesToCreate = templateConfig.stages;
 
   let newDepartments: Department[] = [...departments];
   let newStages: Stage[] = [...stages];
@@ -153,18 +163,23 @@ export function autoSetupProjectSync(
       createdDepts++;
     }
 
-    // Ensure parent department has the 4 stages
+    // Ensure parent department has stages
     const parentStages = newStages.filter((s) => s.department_id === parentDept!.id);
     if (parentStages.length === 0) {
-      DEFAULT_STAGES_CONFIG.forEach((sc, scIdx) => {
-        const stageId = generateId(`stg_${parentDept!.id}_${sc.name.toLowerCase()}`);
+      stagesToCreate.forEach((sc, scIdx) => {
+        const stageId = generateId(`stg_${parentDept!.id}_${sc.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`);
         const stg: Stage = {
           id: stageId,
           department_id: parentDept!.id,
+          project_id: projectId,
           name: sc.name,
           color: sc.color,
           kind: sc.kind,
           order: scIdx + 1,
+          description: sc.description || '',
+          wip_limit: sc.wip_limit,
+          is_archived: false,
+          created_at: new Date().toISOString(),
         };
         newStages.push(stg);
         createdStgs++;
@@ -197,18 +212,23 @@ export function autoSetupProjectSync(
         createdDepts++;
       }
 
-      // Ensure sub-department has 4 stages
+      // Ensure sub-department has stages
       const subStages = newStages.filter((s) => s.department_id === subDept!.id);
       if (subStages.length === 0) {
-        DEFAULT_STAGES_CONFIG.forEach((sc, scIdx) => {
-          const stageId = generateId(`stg_${subDept!.id}_${sc.name.toLowerCase()}`);
+        stagesToCreate.forEach((sc, scIdx) => {
+          const stageId = generateId(`stg_${subDept!.id}_${sc.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`);
           const stg: Stage = {
             id: stageId,
             department_id: subDept!.id,
+            project_id: projectId,
             name: sc.name,
             color: sc.color,
             kind: sc.kind,
             order: scIdx + 1,
+            description: sc.description || '',
+            wip_limit: sc.wip_limit,
+            is_archived: false,
+            created_at: new Date().toISOString(),
           };
           newStages.push(stg);
           createdStgs++;
@@ -242,9 +262,10 @@ export function autoSetupProjectSync(
 export async function autoSetupProject(
   projectId: string,
   projectType: string = 'Project',
-  chosenEnabledDepts?: string[]
+  chosenEnabledDepts?: string[],
+  pipelineTemplateId?: string
 ): Promise<{ createdDepartmentsCount: number; createdStagesCount: number; createdTasksCount: number }> {
-  const syncRes = autoSetupProjectSync(projectId, projectType, chosenEnabledDepts);
+  const syncRes = autoSetupProjectSync(projectId, projectType, chosenEnabledDepts, pipelineTemplateId);
 
   if (isLiveApiConfigured && (syncRes.createdDepartmentsCount > 0 || syncRes.createdStagesCount > 0)) {
     try {
